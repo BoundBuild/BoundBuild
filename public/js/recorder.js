@@ -1,5 +1,10 @@
 /* BoundBuild — audio capture (MediaRecorder) + live transcription (Web Speech API).
-   Falls back gracefully: no mic → manual/sample transcript. */
+   Falls back gracefully: no mic → manual/sample transcript.
+   v3 — iOS hardening:
+     • fresh AudioContext per recording (iOS requires this to properly acquire/release the mic)
+     • wait for a dataavailable chunk BEFORE showing "recording" as started
+     • if no audio data is captured at all, surface a clear message instead of
+       uploading a 0-byte file (which Whisper rejects as "Invalid file format") */
 'use strict';
 
 const Recorder = (() => {
@@ -18,25 +23,45 @@ const Recorder = (() => {
     return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   }
 
-  async function start({ onLive, onEnd } = {}) {
+  /** iOS quirk: touching the AudioContext on user-gesture unlocks audio input. */
+  function unlockAudio() {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        if (ctx.state === 'suspended') ctx.resume();
+        setTimeout(() => { try { ctx.close(); } catch (e) { /* ignore */ } }, 800);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  async function start({ onLive, onEnd, onError } = {}) {
     onLiveText = onLive || null;
     transcriptAccum = '';
     finalTranscript = '';
+
+    unlockAudio(); // must happen inside the user-gesture handler (the tap)
+
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const mime = pickMime();
     mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
     chunks = [];
-    mediaRecorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+
+    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+
     mediaRecorder.onstop = () => {
       stream.getTracks().forEach((t) => t.stop());
       const type = (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm';
       const blob = new Blob(chunks, { type });
       stopSpeech();
       const transcript = finalTranscript || transcriptAccum.trim();
-      onEnd && onEnd({ blob, mime: type, transcript });
+      if (onEnd) onEnd({ blob, mime: type, transcript, bytes: blob.size });
     };
-    mediaRecorder.start(250); // timeslice — REQUIRED for iOS Safari: without it the
-    // blob can come back empty or corrupt ("Invalid file format" in Whisper).
+
+    // timeslice — REQUIRED for iOS Safari: without it the blob can come back
+    // empty or corrupt ("Invalid file format" in Whisper).
+    mediaRecorder.start(250);
+
     startSpeech();
     return true;
   }
