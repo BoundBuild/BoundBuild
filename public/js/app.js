@@ -420,20 +420,34 @@ const App = (() => {
                 timer.textContent = 'Uploading audio…';
                 const ext = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : 'webm';
                 let serverTranscript = null;
-                try {
-                  const up = await API.uploadMedia('audio', blob, ext);
-                  c.audio = { mediaId: up.id, url: up.url, mime };
-                  // Server-side STT when configured (phone → BoundBuild → STT API);
-                  // otherwise this returns provider:'browser' and we fall back below.
-                  timer.textContent = 'Transcribing…';
+                let sttError = null;
+                if (blob && blob.size > 0 && blob.size < 1500) {
+                  // A near-empty blob means the mic captured nothing (common iOS quirk).
+                  toast('Recording came out empty — try recording again, or type the description', 'warn');
+                } else {
                   try {
-                    const r = await API.transcribe(up.id);
-                    if (r && r.transcript) serverTranscript = r.transcript;
-                  } catch (e) { /* fall back to browser transcript */ }
-                } catch (e) {
-                  toast('Audio upload failed (offline?) — continuing with your text', 'warn');
+                    const up = await API.uploadMedia('audio', blob, ext);
+                    c.audio = { mediaId: up.id, url: up.url, mime };
+                    // Server-side STT when configured (phone → BoundBuild → STT API);
+                    // otherwise this returns provider:'browser' and we fall back below.
+                    timer.textContent = 'Transcribing…';
+                    try {
+                      const r = await API.transcribe(up.id);
+                      if (r && r.transcript) serverTranscript = r.transcript;
+                      else if (r && r.error) sttError = r.error;
+                    } catch (e) { sttError = e.message || 'transcription request failed'; }
+                  } catch (e) {
+                    toast('Audio upload failed (offline?) — continuing with your text', 'warn');
+                  }
                 }
                 c.transcript = (serverTranscript || transcript || '').trim();
+                if (!serverTranscript && !c.transcript) {
+                  if (sttError) {
+                    toast('Voice transcription failed: ' + sttError.slice(0, 140) + ' — you can type the description below', 'warn');
+                  } else {
+                    toast('No transcription available on this device — type the description below', 'warn');
+                  }
+                }
                 c.step = 'note'; refreshCapture();
               },
             });
