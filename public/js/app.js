@@ -416,14 +416,17 @@ const App = (() => {
           try {
             await Recorder.start({
               onLive: (t) => { c.liveText = t; const el = $('#rec-live'); if (el) el.textContent = t || 'Live captioning on — speak naturally…'; },
-              onEnd: async ({ blob, mime, transcript }) => {
+              onEnd: async ({ blob, mime, transcript, bytes }) => {
                 timer.textContent = 'Uploading audio…';
                 const ext = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : 'webm';
                 let serverTranscript = null;
                 let sttError = null;
-                if (blob && blob.size > 0 && blob.size < 1500) {
-                  // A near-empty blob means the mic captured nothing (common iOS quirk).
-                  toast('Recording came out empty — try recording again, or type the description', 'warn');
+                if (!blob || !blob.size) {
+                  // Zero bytes captured — the mic/recorder produced nothing.
+                  toast('No audio was captured — tap record, speak, then stop (mic needs a second to start)', 'warn');
+                } else if (blob.size < 1000) {
+                  // Suspiciously tiny — likely a silent/empty capture.
+                  toast('Recording was too short or silent — try a longer note, or type the description', 'warn');
                 } else {
                   try {
                     const up = await API.uploadMedia('audio', blob, ext);
@@ -444,6 +447,10 @@ const App = (() => {
                 if (!serverTranscript && !c.transcript) {
                   if (sttError) {
                     toast('Voice transcription failed: ' + sttError.slice(0, 140) + ' — you can type the description below', 'warn');
+                  } else if (!blob || !blob.size) {
+                    toast('No audio captured — try again or type the description', 'warn');
+                  } else if (blob.size < 1000) {
+                    toast('Recording was too short or silent — try a longer note', 'warn');
                   } else {
                     toast('No transcription available on this device — type the description below', 'warn');
                   }
