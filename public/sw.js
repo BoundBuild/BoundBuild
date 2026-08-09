@@ -4,7 +4,7 @@
    updates (like recorder fixes) actually reach installed phones.
    v2 — switched from cache-first to network-first. */
 
-const CACHE = 'boundbuild-v2';
+const CACHE = 'boundbuild-v8';
 const SHELL = ['/', '/index.html', '/css/app.css', '/js/util.js', '/js/api.js', '/js/recorder.js', '/js/app.js', '/icons/icon-512.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
