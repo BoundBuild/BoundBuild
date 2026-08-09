@@ -304,6 +304,8 @@ textarea { resize: vertical; min-height: 90px; }
 .rec-inner svg { width: 56px; height: 56px; color: #0A0C0E; }
 .rec-btn.recording .rec-inner { background: radial-gradient(circle at 50% 30%, #FF5A5F, #D92B30 70%); }
 .rec-timer { font-weight: 900; font-size: 26px; letter-spacing: 2px; margin-top: 22px; font-variant-numeric: tabular-nums; }
+.rec-meter-wrap { height: 6px; border-radius: 3px; background: var(--surface2); margin: 12px auto 0; max-width: 340px; overflow: hidden; }
+.rec-meter { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--amber)); transition: width 90ms linear; }
 .rec-live {
   margin: 14px auto 0; max-width: 480px;
   background: var(--surface); border: 1px solid var(--border);
