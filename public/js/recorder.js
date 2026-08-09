@@ -35,7 +35,8 @@ const Recorder = (() => {
       const transcript = finalTranscript || transcriptAccum.trim();
       onEnd && onEnd({ blob, mime: type, transcript });
     };
-    mediaRecorder.start();
+    mediaRecorder.start(250); // timeslice — REQUIRED for iOS Safari: without it the
+    // blob can come back empty or corrupt ("Invalid file format" in Whisper).
     startSpeech();
     return true;
   }
