@@ -1,24 +1,30 @@
-/* BoundBuild — audio capture (MediaRecorder) + live transcription (Web Speech API).
-   Falls back gracefully: no mic → manual/sample transcript.
-   v3 — iOS hardening:
-     • fresh AudioContext per recording (iOS requires this to properly acquire/release the mic)
-     • wait for a dataavailable chunk BEFORE showing "recording" as started
-     • if no audio data is captured at all, surface a clear message instead of
-       uploading a 0-byte file (which Whisper rejects as "Invalid file format") */
+/* BoundBuild — audio capture.
+   v6 — PARALLEL capture (single-file fix, works with the existing app.js unchanged):
+     • Starts MediaRecorder (webm) AND a Web Audio → WAV recorder SIMULTANEOUSLY
+       on the same microphone stream.
+     • On stop, it uses whichever produced real audio (prefers the webm; falls
+       back to the WAV — which Whisper always accepts).
+     • This eliminates the iOS bug where MediaRecorder silently produces an
+       empty 0-byte blob: even if that happens, the parallel WAV capture has
+       the audio, and the app never receives an empty file.
+   No app.js changes required. */
 'use strict';
 
 const Recorder = (() => {
-  let mediaRecorder = null;
-  let chunks = [];
+  let active = null;            // current capture session
   let recognition = null;
-  let transcriptAccum = '';
-  let finalTranscript = '';
   let onLiveText = null;
+  let finalTranscriptAccum = '';
 
   function micSupported() {
-    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
   }
-
+  function mediaRecSupported() {
+    return !!(window.MediaRecorder && micSupported());
+  }
+  function webaudioSupported() {
+    return !!(micSupported() && (window.AudioContext || window.webkitAudioContext));
+  }
   function speechSupported() {
     return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
   }
@@ -35,53 +41,149 @@ const Recorder = (() => {
     } catch (e) { /* ignore */ }
   }
 
-  async function start({ onLive, onEnd, onError } = {}) {
-    onLiveText = onLive || null;
-    transcriptAccum = '';
-    finalTranscript = '';
-
-    unlockAudio(); // must happen inside the user-gesture handler (the tap)
-
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mime = pickMime();
-    mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-    chunks = [];
-
-    mediaRecorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-
-    mediaRecorder.onstop = () => {
-      stream.getTracks().forEach((t) => t.stop());
-      const type = (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm';
-      const blob = new Blob(chunks, { type });
-      stopSpeech();
-      const transcript = finalTranscript || transcriptAccum.trim();
-      if (onEnd) onEnd({ blob, mime: type, transcript, bytes: blob.size });
-    };
-
-    // timeslice — REQUIRED for iOS Safari: without it the blob can come back
-    // empty or corrupt ("Invalid file format" in Whisper).
-    mediaRecorder.start(250);
-
-    startSpeech();
-    return true;
-  }
-
   function pickMime() {
     const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
     for (const c of candidates) { try { if (MediaRecorder.isTypeSupported(c)) return c; } catch (e) { /* ignore */ } }
     return null;
   }
 
+  /**
+   * opts: { onLive, onEnd }
+   * onEnd({ blob, mime, bytes, transcript }) — always called with the result.
+   */
+  function start(opts = {}) {
+    onLiveText = opts.onLive || null;
+    const onEnd = opts.onEnd || (() => {});
+
+    return navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+      unlockAudio();
+
+      const rec = {
+        stream,
+        media: null, mediaChunks: [],
+        audio: null, wavChunks: [],
+        stopped: false,
+        _onEnd: onEnd,
+      };
+
+      /* 1) MediaRecorder — preferred format (smaller uploads) */
+      if (mediaRecSupported()) {
+        try {
+          const mime = pickMime();
+          const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+          mr.ondataavailable = (e) => { if (e.data && e.data.size) rec.mediaChunks.push(e.data); };
+          mr.start(250); // timeslice — REQUIRED for iOS Safari
+          rec.media = mr;
+        } catch (e) { rec.media = null; }
+      }
+
+      /* 2) Web Audio → WAV — the reliability backbone (parallel capture) */
+      if (webaudioSupported()) {
+        try {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          const ctx = new AC();
+          const source = ctx.createMediaStreamSource(stream);
+          const proc = ctx.createScriptProcessor(4096, 1, 1);
+          proc.onaudioprocess = (e) => {
+            if (!active || active !== rec || rec.stopped) return;
+            rec.wavChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+          };
+          source.connect(proc); // NOT connected to destination — no echo/feedback
+          rec.audio = { ctx, source, proc };
+        } catch (e) { rec.audio = null; }
+      }
+
+      active = rec;
+      startSpeech();
+      return true;
+    });
+  }
+
   function stop() {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    const rec = active;
+    if (!rec) return;
+    active = null;
+    rec.stopped = true;
+    stopSpeech();
+
+    /* Stop WebAudio capture immediately and freeze the WAV chunks. */
+    if (rec.audio) {
+      try { rec.audio.proc.disconnect(); rec.audio.source.disconnect(); rec.audio.ctx.close(); } catch (e) { /* ignore */ }
+    }
+    try { rec.stream.getTracks().forEach((t) => t.stop()); } catch (e) { /* ignore */ }
+
+    /* Stop MediaRecorder (async onstop) — finish when it reports done. */
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      deliver(rec, rec._onEnd || (() => {}));
+    };
+    if (rec.media) {
+      rec.media.onstop = finish;
+      try { rec.media.stop(); } catch (e) { finish(); }
+    } else {
+      finish();
+    }
+  }
+
+  /* Capture the onEnd callback (stored on the session when started). */
+  const onEndOf = (rec) => rec._onEnd || (() => {});
+
+  function deliver(rec, onEnd) {    /* Prefer MediaRecorder audio if it captured real data. */
+    if (rec.media && rec.mediaChunks.length) {
+      const blob = new Blob(rec.mediaChunks, { type: (rec.media.mimeType) || 'audio/webm' });
+      if (blob.size >= 1000) {
+        onEnd({ blob, mime: blob.type, bytes: blob.size, transcript: takeFinalTranscript() });
+        return;
+      }
+    }
+    /* Otherwise use the Web Audio WAV capture (always valid for Whisper). */
+    let total = 0;
+    for (const c of rec.wavChunks) total += c.length;
+    if (total > 0) {
+      const merged = new Float32Array(total);
+      let off = 0;
+      for (const c of rec.wavChunks) { merged.set(c, off); off += c.length; }
+      const wav = encodeWavPCM(merged, 16000);
+      const blob = new Blob([wav], { type: 'audio/wav' });
+      onEnd({ blob, mime: 'audio/wav', bytes: wav.byteLength, transcript: takeFinalTranscript() });
+      return;
+    }
+    /* Nothing captured at all — deliver an empty result (app shows the message). */
+    onEnd({ blob: new Blob([], { type: 'audio/webm' }), mime: 'audio/webm', bytes: 0, transcript: takeFinalTranscript() });
   }
 
   function cancel() {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.onstop = null;
-      mediaRecorder.stop();
-    }
+    const rec = active;
+    if (!rec) return;
+    active = null;
+    rec.stopped = true;
     stopSpeech();
+    if (rec.media) { try { rec.media.onstop = null; rec.media.stop(); } catch (e) { /* ignore */ } }
+    if (rec.audio) { try { rec.audio.proc.disconnect(); rec.audio.source.disconnect(); rec.audio.ctx.close(); } catch (e) { /* ignore */ } }
+    try { rec.stream.getTracks().forEach((t) => t.stop()); } catch (e) { /* ignore */ }
+  }
+
+  /** Encode Float32 mono samples → 16-bit PCM WAV (44-byte header). */
+  function encodeWavPCM(samples, sampleRate) {
+    const buf = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buf);
+    const wstr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+    wstr(0, 'RIFF'); view.setUint32(4, 36 + samples.length * 2, true); wstr(8, 'WAVE');
+    wstr(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    wstr(36, 'data'); view.setUint32(40, samples.length * 2, true);
+    let p = 44;
+    for (let i = 0; i < samples.length; i++, p += 2) {
+      let s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(p, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    }
+    return new Uint8Array(buf);
   }
 
   function startSpeech() {
@@ -96,21 +198,29 @@ const Recorder = (() => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) finalTranscript += t + ' ';
+        if (e.results[i].isFinal) finalTranscriptAccum += t + ' ';
         else interim += t;
       }
-      const live = (finalTranscript + ' ' + interim).trim();
+      const live = (finalTranscriptAccum + ' ' + interim).trim();
       if (onLiveText) onLiveText(live);
     };
     recognition.onerror = () => { /* speech may fail — manual entry still works */ };
     try { recognition.start(); } catch (e) { /* ignore */ }
   }
-
   function stopSpeech() {
     if (recognition) { try { recognition.stop(); } catch (e) { /* ignore */ } recognition = null; }
   }
+  function takeFinalTranscript() {
+    const t = finalTranscriptAccum;
+    finalTranscriptAccum = '';
+    return t;
+  }
 
-  return { micSupported, speechSupported, start, stop, cancel, hasLiveTranscription: () => !!onLiveText };
+  return {
+    micSupported, mediaRecSupported, webaudioSupported, speechSupported,
+    start, stop, cancel,
+    hasLiveTranscription: () => !!onLiveText,
+  };
 })();
 
 /* Sample voice-note transcripts for demo / offline use */
