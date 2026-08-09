@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/30866963/README.md)
+
 # BoundBuild — MVP
 
 > **Capture. Document. Get Paid.**
