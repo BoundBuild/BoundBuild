@@ -7,6 +7,13 @@
  *   3. Outbox fallback: dispatch record + branded .eml + recipient link + PDF
  *
  * Every dispatch carries the branded Commercial Event Record PDF attachment.
+ *
+ * Resend URL handling (v2):
+ *   The endpoint is derived from RESEND_API_URL (default https://api.resend.com/v1)
+ *   with automatic normalization: trailing slashes and a trailing '/emails' are
+ *   stripped, so a misconfigured value can never produce '.../emails/emails'
+ *   (which caused Resend HTTP 405). The effective endpoint is also surfaced in
+ *   /api/admin/email-status and in error logs for easy diagnosis.
  */
 
 const { outboxEmailHtml } = require('./emailTemplate');
@@ -43,8 +50,18 @@ function buildEml({ from, to, subject, html, attachments = [] }) {
   return lines.join('\r\n');
 }
 
+/** Normalized Resend base URL — never includes a trailing slash or '/emails'. */
+function resendBaseUrl() {
+  const DEF = 'https://api.resend.com/v1';
+  const raw = String(process.env.RESEND_API_URL || '').trim();
+  if (!raw) return DEF;
+  let base = raw.replace(/\/+$/, '').replace(/\/emails$/i, '');
+  if (!/^https?:\/\/.+/.test(base)) return DEF;
+  return base;
+}
+
 async function sendViaResend({ to, subject, html, attachments }) {
-  const url = (process.env.RESEND_API_URL || 'https://api.resend.com/v1') + '/emails';
+  const url = resendBaseUrl() + '/emails';
   const from = process.env.RESEND_FROM || process.env.SMTP_FROM || 'BoundBuild <onboarding@resend.dev>';
   const body = {
     from,
@@ -63,7 +80,7 @@ async function sendViaResend({ to, subject, html, attachments }) {
   });
   if (!res.ok) {
     const text = (await res.text()).slice(0, 300);
-    throw new Error(`Resend HTTP ${res.status}: ${text}`);
+    throw new Error(`Resend HTTP ${res.status} [${url}]: ${text}`);
   }
   const data = await res.json();
   return { id: data.id };
@@ -117,6 +134,7 @@ function emailConfig() {
     return {
       provider: 'resend', configured: true,
       from: process.env.RESEND_FROM || process.env.SMTP_FROM || 'BoundBuild <onboarding@resend.dev>',
+      endpoint: resendBaseUrl() + '/emails',
     };
   }
   if (process.env.SMTP_HOST) {
@@ -131,4 +149,4 @@ function dispatchEmail({ event, project, to, recipientLink, fromName }) {
   return { subject, html };
 }
 
-module.exports = { buildEml, sendEmail, emailConfig, dispatchEmail };
+module.exports = { buildEml, sendEmail, emailConfig, dispatchEmail, resendBaseUrl };
