@@ -35,7 +35,7 @@ let db = null;
 
 function load() {
   if (db) return db;
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true, mode: 0o755 });
   if (fs.existsSync(DB_FILE)) {
     try {
       db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
