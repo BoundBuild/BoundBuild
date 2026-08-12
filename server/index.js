@@ -84,6 +84,11 @@ function canSeeEvent(user, evt) {
   return canSeeCompany(user, evt.companyId);
 }
 
+// ---------- health check ----------
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, service: 'boundbuild', version: '0.1.0', time: now() });
+});
+
 // ---------- auth routes ----------
 app.post('/api/auth/register', (req, res) => {
   const { name, email, password, companyName } = req.body || {};
@@ -160,7 +165,7 @@ app.post('/api/upload', requireAuth, express.raw({ type: '*/*', limit: '80mb' })
   const fileId = id(kind === 'audio' ? 'aud' : 'img');
   const sub = kind === 'audio' ? 'audio' : 'images';
   const dir = path.join(UPLOADS_DIR, sub);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true, mode: 0o755 });
   const filename = `${fileId}.${ext}`;
   fs.writeFileSync(path.join(dir, filename), req.body);
   const mime = req.headers['content-type'] || (kind === 'audio' ? 'audio/webm' : 'image/jpeg');
@@ -206,7 +211,6 @@ app.post('/api/ai/structure', requireAuth, async (req, res) => {
   const { transcript, projectId, eventTypeHint, mediaId } = req.body || {};
   let text = transcript;
   let sttInfo = null;
-  // Optional server-side transcription: pass an audio mediaId with no transcript.
   if ((!text || String(text).trim().length < 5) && mediaId) {
     const m = db.media.find((x) => x.id === mediaId && x.kind === 'audio');
     if (!m) return res.status(400).json({ error: 'Audio media not found' });
@@ -227,7 +231,7 @@ app.post('/api/ai/structure', requireAuth, async (req, res) => {
   res.json({ draft, engine: draft.engine, note: llm ? 'LLM draft' : 'Heuristic draft (offline AI v1)', stt: sttInfo || null });
 });
 
-// ---------- capture sessions (instrumentation) ----------
+// ---------- capture sessions ----------
 app.post('/api/capture/start', requireAuth, (req, res) => {
   const { projectId } = req.body || {};
   const s = { id: id('cap'), userId: req.user.id, projectId: projectId || null, startedAt: now(), savedAt: null, eventId: null, durationMs: null, abandoned: false };
@@ -438,52 +442,7 @@ app.post('/api/admin/email-test', requireAuth, requireRole('founder', 'admin'), 
   res.json(result);
 });
 
-app.post('/api/events/:id/review', requireAuth, requireRole('founder', 'admin'), (req, res) => {
-  const e = db.events.find((x) => x.id === req.params.id);
-  if (!canSeeEvent(req.user, e)) return res.status(404).json({ error: 'Event not found' });
-  e.status = 'reviewed'; e.reviewedAt = now(); e.reviewedById = req.user.id;
-  e.audit.push({ action: 'Reviewed', by: { id: req.user.id, name: req.user.name }, at: now(), detail: 'Marked as reviewed in the office' });
-  pushAudit('event', e.id, 'Reviewed', 'Reviewed by office', req.user);
-  save();
-  res.json(eventToJson(e));
-});
-
-// ---------- admin: companies / users ----------
-app.get('/api/admin/companies', requireAuth, requireRole('founder'), (req, res) => {
-  res.json(db.companies.map((c) => ({
-    ...c,
-    userCount: db.users.filter((u) => u.companyId === c.id).length,
-    projectCount: db.projects.filter((p) => p.companyId === c.id).length,
-    eventCount: db.events.filter((e) => e.companyId === c.id).length,
-  })));
-});
-
-app.get('/api/admin/users', requireAuth, requireRole('founder', 'admin'), (req, res) => {
-  let list = db.users;
-  if (req.user.role !== 'founder') list = list.filter((u) => u.companyId === req.user.companyId);
-  res.json(list.map(scrubUser));
-});
-
-app.post('/api/admin/users', requireAuth, requireRole('founder', 'admin'), (req, res) => {
-  const { name, email, role, password } = req.body || {};
-  if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password required' });
-  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  const companyId = req.user.role === 'founder' ? (req.body.companyId || req.user.companyId) : req.user.companyId;
-  if (db.users.some((u) => u.email.toLowerCase() === email.toLowerCase())) return res.status(400).json({ error: 'Email already in use' });
-  const salt = crypto.randomBytes(16).toString('hex');
-  const user = {
-    id: id('usr'), name, email: email.toLowerCase(), salt,
-    passwordHash: hashPassword(password, salt),
-    role: ['user', 'admin'].includes(role) ? role : 'user',
-    companyId, active: true, createdAt: now(), lastSeenAt: null,
-  };
-  db.users.push(user);
-  pushAudit('user', user.id, 'Created', `User ${name} created`, req.user);
-  save();
-  res.json(scrubUser(user));
-});
-
-// ---------- admin: metrics (pilot instrumentation) ----------
+// ---------- admin: metrics ----------
 app.get('/api/admin/metrics', requireAuth, requireRole('founder', 'admin'), (req, res) => {
   const companyIds = req.user.role === 'founder'
     ? db.companies.map((c) => c.id)
@@ -503,7 +462,6 @@ app.get('/api/admin/metrics', requireAuth, requireRole('founder', 'admin'), (req
   const usableDrafts = events.filter((e) => e.ai && (e.ai.used || e.fieldsChangedAfterDraft !== undefined) && Number(e.fieldsChangedAfterDraft || 0) <= 2);
   const sent = events.filter((e) => e.sentAt);
 
-  // events per day, last 14 days
   const days = [];
   for (let i = 13; i >= 0; i--) {
     const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
@@ -514,14 +472,13 @@ app.get('/api/admin/metrics', requireAuth, requireRole('founder', 'admin'), (req
     });
   }
 
-  // active users per day, last 14 days
   const activeByDay = days.map((d) => ({ label: d.label, count: 0 }));
   for (let i = 13; i >= 0; i--) {
     const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
     const next = new Date(d); next.setDate(d.getDate() + 1);
     activeByDay[13 - i].count = users.filter((u) => {
       const acts = [u.lastSeenAt, ...sessions.filter((s) => s.userId === u.id).map((s) => s.startedAt)];
-      return acts.some((a) => a && { start: new Date(a) }.start >= d && { start: new Date(a) }.start < next);
+      return acts.some((a) => a && new Date(a) >= d && new Date(a) < next);
     }).length;
   }
 
@@ -542,6 +499,32 @@ app.get('/api/admin/metrics', requireAuth, requireRole('founder', 'admin'), (req
     days, activeByDay, byType, byStatus,
     recentEvents: events.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8).map(eventToJson),
   });
+});
+
+// ---------- admin: users ----------
+app.get('/api/admin/users', requireAuth, requireRole('founder', 'admin'), (req, res) => {
+  let list = db.users;
+  if (req.user.role !== 'founder') list = list.filter((u) => u.companyId === req.user.companyId);
+  res.json(list.map(scrubUser));
+});
+
+app.post('/api/admin/users', requireAuth, requireRole('founder', 'admin'), (req, res) => {
+  const { name, email, role, password } = req.body || {};
+  if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password required' });
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+  const companyId = req.user.role === 'founder' ? (req.body.companyId || req.user.companyId) : req.user.companyId;
+  if (db.users.some((u) => u.email.toLowerCase() === email.toLowerCase())) return res.status(400).json({ error: 'Email already in use' });
+  const salt = crypto.randomBytes(16).toString('hex');
+  const user = {
+    id: id('usr'), name, email: email.toLowerCase(), salt,
+    passwordHash: hashPassword(password, salt),
+    role: ['user', 'admin'].includes(role) ? role : 'user',
+    companyId, active: true, createdAt: now(), lastSeenAt: null,
+  };
+  db.users.push(user);
+  pushAudit('user', user.id, 'Created', `User ${user.name} created`, req.user);
+  save();
+  res.json(scrubUser(user));
 });
 
 // ---------- admin: outbox ----------
@@ -566,10 +549,9 @@ app.get('/api/admin/outbox/:id.eml', requireAuth, requireRole('founder', 'admin'
   if (req.user.role !== 'founder') {
     if (e.companyId !== req.user.companyId) return res.status(404).json({ error: 'Not found' });
   }
-  // Regenerate with the PDF attached so the .eml is always complete.
   const pdf = await generateEventPdfSafe(e);
   const eml = buildEml({
-    from: 'BoundBuild <events@boundbuild.app>',
+    from: 'BoundBuild <events@boundbuild.co.nz>',
     to: o.to, subject: o.subject, html: o.html,
     attachments: pdf ? [{ filename: `BoundBuild-${e.ref || e.id}.pdf`, contentType: 'application/pdf', content: pdf }] : [],
   });
@@ -600,7 +582,17 @@ app.get('/api/admin/outbox/:id.html', requireAuth, requireRole('founder', 'admin
   res.send(o.html || '<p>No body</p>');
 });
 
-// ---------- admin: CSV exports ----------
+// ---------- admin: companies (founder only) ----------
+app.get('/api/admin/companies', requireAuth, requireRole('founder'), (req, res) => {
+  res.json(db.companies.map((c) => ({
+    ...c,
+    userCount: db.users.filter((u) => u.companyId === c.id).length,
+    projectCount: db.projects.filter((p) => p.companyId === c.id).length,
+    eventCount: db.events.filter((e) => e.companyId === c.id).length,
+  })));
+});
+
+// ---------- admin: exports ----------
 app.get('/api/admin/export/events.csv', requireAuth, requireRole('founder', 'admin'), (req, res) => {
   const companyIds = req.user.role === 'founder' ? db.companies.map((c) => c.id) : [req.user.companyId];
   const list = db.events.filter((e) => companyIds.includes(e.companyId)).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -675,11 +667,6 @@ app.get('/r/:token', (req, res) => {
     </div>
   </div>
 </div></body></html>`);
-});
-
-// ---------- health check (for deployment uptime monitoring) ----------
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, service: 'boundbuild', version: '0.1.0', time: now() });
 });
 
 // ---------- SPA fallback ----------
