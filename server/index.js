@@ -17,7 +17,7 @@ const { transcribeAudio } = require('./stt');
 const { seed } = require('./seed');
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 8080;require('./pilot')(app);
 
 // ---------- boot ----------
 seed();
