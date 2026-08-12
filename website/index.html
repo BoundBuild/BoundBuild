@@ -354,7 +354,7 @@
     </div>
     <div class="email-mock rv">
       <div class="em-chrome">
-        <div>From: <b>BoundBuild &lt;<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="d5b0a3b0bba1a695b7baa0bbb1b7a0bcb9b1fbb6bafbbbaf">[email&#160;protected]</a>&gt;</b> &nbsp;·&nbsp; To: <b><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="fb8a88bb82948e899894968b9a9582d59894d59581">[email&#160;protected]</a></b></div>
+        <div>From: <b>BoundBuild &lt;<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="93f6e5f6fde7e0d3f1fce6fdf7f1e6fafff7bdf0fcbdfde9">[email&#160;protected]</a>&gt;</b> &nbsp;·&nbsp; To: <b><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="522321122b3d2720313d3f22333c2b7c313d7c3c28">[email&#160;protected]</a></b></div>
         <div class="subj">Subject: [BoundBuild] Variation — Extra power outlets — retail tenancy fitout</div>
       </div>
       <div class="em-body">
@@ -427,8 +427,10 @@
         <div class="field"><label for="f-name">Your name</label><input id="f-name" name="name" type="text" required placeholder="e.g. Sam Carter"></div>
         <div class="field"><label for="f-company">Company</label><input id="f-company" name="company" type="text" required placeholder="e.g. Carter Construction Ltd"></div>
         <div class="field"><label for="f-email">Work email</label><input id="f-email" name="email" type="email" required placeholder="you@company.co.nz"></div>
+        <div class="field" style="display:none;" aria-hidden="true"><label>Website</label><input id="f-website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
         <button class="btn" type="submit" style="width:100%;">Request pilot access</button>
         <div class="form-ok" id="form-ok">Thanks — we've received your request and will be in touch within two business days. 🏗️</div>
+        <div class="form-ok" id="form-err" style="background:rgba(255,90,95,.08);border-color:rgba(255,90,95,.4);color:#FF5A5F;">Sorry — something went wrong sending your request. Please email us directly.</div>
         <p class="form-note">Pilot access is by invitation while we work with a small group of builders. Your details stay with us.</p>
       </form>
     </div>
@@ -461,16 +463,34 @@
   }, { threshold: 0.15 });
   document.querySelectorAll('.rv').forEach(el => io.observe(el));
 
-  // Pilot form (demo — wire to your email/CRM when ready)
-  document.getElementById('pilot-form').addEventListener('submit', (e) => {
+  // Pilot form — sends the enquiry to the BoundBuild app (emails pilot@boundbuild.co.nz)
+  document.getElementById('pilot-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const name = document.getElementById('f-name').value.trim();
     const company = document.getElementById('f-company').value.trim();
     const email = document.getElementById('f-email').value.trim();
+    const website = (document.getElementById('f-website') || {}).value || '';
     if (!name || !company || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return;
-    document.getElementById('form-ok').style.display = 'block';
-    e.target.querySelector('button').disabled = true;
+    const btn = e.target.querySelector('button');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      const r = await fetch('https://app.boundbuild.co.nz/api/pilot-enquiry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, company, email, website }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        document.getElementById('form-ok').style.display = 'block';
+      } else {
+        document.getElementById('form-err').style.display = 'block';
+        btn.disabled = false; btn.textContent = 'Request pilot access';
+      }
+    } catch (err) {
+      document.getElementById('form-err').style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Request pilot access';
+    }
   });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a29f7f65783850c6',t:'MTc4NjUzNzg5Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a29ffc6edff1d992',t:'MTc4NjU0MzAxNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
