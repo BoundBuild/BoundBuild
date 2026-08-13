@@ -47,7 +47,28 @@ http.createServer((req, res) => {
   req.on('data', (c) => (body = Buffer.concat([body, c])));
   req.on('end', () => {
     if (req.method === 'POST' && req.url.startsWith('/v1/audio/transcriptions')) {
-      log(JSON.stringify({ type: 'stt', bytes: body.length }));
+      // Parse the multipart body so the e2e test can assert the file was
+      // normalized to a clean WAV (filename 'recording.wav', 'RIFF' magic)
+      // before being sent to Whisper.
+      let filename = null;
+      let magic = null;
+      const boundaryMatch = (req.headers['content-type'] || '').match(/boundary=(.+)$/);
+      if (boundaryMatch) {
+        const boundary = boundaryMatch[1].replace(/^"|"$/g, '');
+        for (const part of body.toString('latin1').split('--' + boundary)) {
+          const headerEnd = part.indexOf('\r\n\r\n');
+          if (headerEnd === -1) continue;
+          const header = part.slice(0, headerEnd);
+          const content = part.slice(headerEnd + 4);
+          const fnMatch = header.match(/filename="([^"]+)"/);
+          if (header.includes('name="file"') && fnMatch) {
+            filename = fnMatch[1];
+            magic = Buffer.from(content.slice(0, 4), 'latin1').toString('latin1');
+            break;
+          }
+        }
+      }
+      log(JSON.stringify({ type: 'stt', bytes: body.length, filename, magic }));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ text: TRANSCRIPT }));
     } else {
