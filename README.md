@@ -27,9 +27,13 @@ site events, capture sessions, dispatches and analytics on first boot (`data/db.
 |---|---|---|
 | `foreman1@kowhaiconstruction.co.nz` | Foreman (user) | Capture → AI draft → save → dispatch |
 | `qs@kowhaiconstruction.co.nz` | QS (admin) | Pilot console, outbox, team, exports |
-| `founder@boundbuild.app` | Founder | Cross-company view (Companies tab) |
 
 The login screen has one-tap demo logins. **Registration creates a brand-new company** (pilot bootstrap).
+
+> **Founder account** — a private cross-company account exists (sees all pilot builders), but it
+> is **not** a public demo account. Its password is set via the `BB_FOUNDER_PASSWORD`
+> environment variable (never committed to the repo). Without it, a random password is
+> generated at seed time.
 
 ### End-to-end tests
 
