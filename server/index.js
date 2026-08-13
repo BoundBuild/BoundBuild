@@ -24,13 +24,6 @@ seed();
 const db = load();
 
 app.use(express.json({ limit: '25mb' }));
-require('./pilot')(app);
-require('./pilot')(app);   // ← move it here, after the JSON parser
-// ---------- boot ----------
-seed();
-const db = load();
-
-app.use(express.json({ limit: '25mb' }));
 app.use('/media', express.static(UPLOADS_DIR));
 app.use('/media', express.static(path.join(__dirname, '..', 'public'))); // demo media live in public/demo
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: 'index.html' }));
@@ -90,11 +83,6 @@ function canSeeEvent(user, evt) {
   if (!evt) return false;
   return canSeeCompany(user, evt.companyId);
 }
-
-// ---------- health check ----------
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, service: 'boundbuild', version: '0.1.0', time: now() });
-});
 
 // ---------- auth routes ----------
 app.post('/api/auth/register', (req, res) => {
@@ -218,6 +206,7 @@ app.post('/api/ai/structure', requireAuth, async (req, res) => {
   const { transcript, projectId, eventTypeHint, mediaId } = req.body || {};
   let text = transcript;
   let sttInfo = null;
+  // Optional server-side transcription: pass an audio mediaId with no transcript.
   if ((!text || String(text).trim().length < 5) && mediaId) {
     const m = db.media.find((x) => x.id === mediaId && x.kind === 'audio');
     if (!m) return res.status(400).json({ error: 'Audio media not found' });
@@ -238,7 +227,7 @@ app.post('/api/ai/structure', requireAuth, async (req, res) => {
   res.json({ draft, engine: draft.engine, note: llm ? 'LLM draft' : 'Heuristic draft (offline AI v1)', stt: sttInfo || null });
 });
 
-// ---------- capture sessions ----------
+// ---------- capture sessions (instrumentation) ----------
 app.post('/api/capture/start', requireAuth, (req, res) => {
   const { projectId } = req.body || {};
   const s = { id: id('cap'), userId: req.user.id, projectId: projectId || null, startedAt: now(), savedAt: null, eventId: null, durationMs: null, abandoned: false };
@@ -449,66 +438,26 @@ app.post('/api/admin/email-test', requireAuth, requireRole('founder', 'admin'), 
   res.json(result);
 });
 
-// ---------- admin: metrics ----------
-app.get('/api/admin/metrics', requireAuth, requireRole('founder', 'admin'), (req, res) => {
-  const companyIds = req.user.role === 'founder'
-    ? db.companies.map((c) => c.id)
-    : [req.user.companyId];
-  const inScope = (x) => companyIds.includes(x.companyId);
-
-  const events = db.events.filter(inScope);
-  const users = db.users.filter((u) => companyIds.includes(u.companyId));
-  const sessions = db.captureSessions.filter((s) => users.some((u) => u.id === s.userId));
-  const completed = sessions.filter((s) => s.savedAt);
-  const dispatches = db.dispatches.filter((d) => events.some((e) => e.id === d.eventId));
-
-  const weekAgo = Date.now() - 7 * 864e5;
-  const eventsLast7 = events.filter((e) => new Date(e.createdAt).getTime() >= weekAgo);
-  const active7 = users.filter((u) => u.lastSeenAt && new Date(u.lastSeenAt).getTime() >= weekAgo);
-
-  const usableDrafts = events.filter((e) => e.ai && (e.ai.used || e.fieldsChangedAfterDraft !== undefined) && Number(e.fieldsChangedAfterDraft || 0) <= 2);
-  const sent = events.filter((e) => e.sentAt);
-
-  const days = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
-    const next = new Date(d); next.setDate(d.getDate() + 1);
-    days.push({
-      label: d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }),
-      count: events.filter((e) => { const t = new Date(e.createdAt); return t >= d && t < next; }).length,
-    });
-  }
-
-  const activeByDay = days.map((d) => ({ label: d.label, count: 0 }));
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
-    const next = new Date(d); next.setDate(d.getDate() + 1);
-    activeByDay[13 - i].count = users.filter((u) => {
-      const acts = [u.lastSeenAt, ...sessions.filter((s) => s.userId === u.id).map((s) => s.startedAt)];
-      return acts.some((a) => a && new Date(a) >= d && new Date(a) < next);
-    }).length;
-  }
-
-  const byType = {};
-  for (const t of EVENT_TYPES) byType[t] = events.filter((e) => e.type === t).length;
-  const byStatus = { draft: events.filter((e) => e.status === 'draft').length, sent: events.filter((e) => e.status === 'sent').length, reviewed: events.filter((e) => e.status === 'reviewed').length };
-
-  res.json({
-    totals: { events: events.length, users: users.length, projects: db.projects.filter((p) => companyIds.includes(p.companyId)).length, dispatches: dispatches.length },
-    metrics: {
-      medianCaptureSec: Math.round(median(completed.map((s) => s.durationMs).filter(Boolean)) / 1000),
-      completionRate: sessions.length ? Math.round(completed.length / sessions.length * 100) : 0,
-      usableDraftRate: events.length ? Math.round(usableDrafts.length / events.length * 100) : 0,
-      dispatchRate: events.length ? Math.round(sent.length / events.length * 100) : 0,
-      wau: users.length ? Math.round(active7.length / users.length * 100) : 0,
-      eventsPerUserWeek: active7.length ? Math.round(eventsLast7.length / active7.length * 10) / 10 : 0,
-    },
-    days, activeByDay, byType, byStatus,
-    recentEvents: events.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8).map(eventToJson),
-  });
+app.post('/api/events/:id/review', requireAuth, requireRole('founder', 'admin'), (req, res) => {
+  const e = db.events.find((x) => x.id === req.params.id);
+  if (!canSeeEvent(req.user, e)) return res.status(404).json({ error: 'Event not found' });
+  e.status = 'reviewed'; e.reviewedAt = now(); e.reviewedById = req.user.id;
+  e.audit.push({ action: 'Reviewed', by: { id: req.user.id, name: req.user.name }, at: now(), detail: 'Marked as reviewed in the office' });
+  pushAudit('event', e.id, 'Reviewed', 'Reviewed by office', req.user);
+  save();
+  res.json(eventToJson(e));
 });
 
-// ---------- admin: users ----------
+// ---------- admin: companies / users ----------
+app.get('/api/admin/companies', requireAuth, requireRole('founder'), (req, res) => {
+  res.json(db.companies.map((c) => ({
+    ...c,
+    userCount: db.users.filter((u) => u.companyId === c.id).length,
+    projectCount: db.projects.filter((p) => p.companyId === c.id).length,
+    eventCount: db.events.filter((e) => e.companyId === c.id).length,
+  })));
+});
+
 app.get('/api/admin/users', requireAuth, requireRole('founder', 'admin'), (req, res) => {
   let list = db.users;
   if (req.user.role !== 'founder') list = list.filter((u) => u.companyId === req.user.companyId);
@@ -529,9 +478,70 @@ app.post('/api/admin/users', requireAuth, requireRole('founder', 'admin'), (req,
     companyId, active: true, createdAt: now(), lastSeenAt: null,
   };
   db.users.push(user);
-  pushAudit('user', user.id, 'Created', `User ${user.name} created`, req.user);
+  pushAudit('user', user.id, 'Created', `User ${name} created`, req.user);
   save();
   res.json(scrubUser(user));
+});
+
+// ---------- admin: metrics (pilot instrumentation) ----------
+app.get('/api/admin/metrics', requireAuth, requireRole('founder', 'admin'), (req, res) => {
+  const companyIds = req.user.role === 'founder'
+    ? db.companies.map((c) => c.id)
+    : [req.user.companyId];
+  const inScope = (x) => companyIds.includes(x.companyId);
+
+  const events = db.events.filter(inScope);
+  const users = db.users.filter((u) => companyIds.includes(u.companyId));
+  const sessions = db.captureSessions.filter((s) => users.some((u) => u.id === s.userId));
+  const completed = sessions.filter((s) => s.savedAt);
+  const dispatches = db.dispatches.filter((d) => events.some((e) => e.id === d.eventId));
+
+  const weekAgo = Date.now() - 7 * 864e5;
+  const eventsLast7 = events.filter((e) => new Date(e.createdAt).getTime() >= weekAgo);
+  const active7 = users.filter((u) => u.lastSeenAt && new Date(u.lastSeenAt).getTime() >= weekAgo);
+
+  const usableDrafts = events.filter((e) => e.ai && (e.ai.used || e.fieldsChangedAfterDraft !== undefined) && Number(e.fieldsChangedAfterDraft || 0) <= 2);
+  const sent = events.filter((e) => e.sentAt);
+
+  // events per day, last 14 days
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
+    const next = new Date(d); next.setDate(d.getDate() + 1);
+    days.push({
+      label: d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }),
+      count: events.filter((e) => { const t = new Date(e.createdAt); return t >= d && t < next; }).length,
+    });
+  }
+
+  // active users per day, last 14 days
+  const activeByDay = days.map((d) => ({ label: d.label, count: 0 }));
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
+    const next = new Date(d); next.setDate(d.getDate() + 1);
+    activeByDay[13 - i].count = users.filter((u) => {
+      const acts = [u.lastSeenAt, ...sessions.filter((s) => s.userId === u.id).map((s) => s.startedAt)];
+      return acts.some((a) => a && { start: new Date(a) }.start >= d && { start: new Date(a) }.start < next);
+    }).length;
+  }
+
+  const byType = {};
+  for (const t of EVENT_TYPES) byType[t] = events.filter((e) => e.type === t).length;
+  const byStatus = { draft: events.filter((e) => e.status === 'draft').length, sent: events.filter((e) => e.status === 'sent').length, reviewed: events.filter((e) => e.status === 'reviewed').length };
+
+  res.json({
+    totals: { events: events.length, users: users.length, projects: db.projects.filter((p) => companyIds.includes(p.companyId)).length, dispatches: dispatches.length },
+    metrics: {
+      medianCaptureSec: Math.round(median(completed.map((s) => s.durationMs).filter(Boolean)) / 1000),
+      completionRate: sessions.length ? Math.round(completed.length / sessions.length * 100) : 0,
+      usableDraftRate: events.length ? Math.round(usableDrafts.length / events.length * 100) : 0,
+      dispatchRate: events.length ? Math.round(sent.length / events.length * 100) : 0,
+      wau: users.length ? Math.round(active7.length / users.length * 100) : 0,
+      eventsPerUserWeek: active7.length ? Math.round(eventsLast7.length / active7.length * 10) / 10 : 0,
+    },
+    days, activeByDay, byType, byStatus,
+    recentEvents: events.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8).map(eventToJson),
+  });
 });
 
 // ---------- admin: outbox ----------
@@ -556,9 +566,10 @@ app.get('/api/admin/outbox/:id.eml', requireAuth, requireRole('founder', 'admin'
   if (req.user.role !== 'founder') {
     if (e.companyId !== req.user.companyId) return res.status(404).json({ error: 'Not found' });
   }
+  // Regenerate with the PDF attached so the .eml is always complete.
   const pdf = await generateEventPdfSafe(e);
   const eml = buildEml({
-    from: 'BoundBuild <events@boundbuild.co.nz>',
+    from: 'BoundBuild <events@boundbuild.app>',
     to: o.to, subject: o.subject, html: o.html,
     attachments: pdf ? [{ filename: `BoundBuild-${e.ref || e.id}.pdf`, contentType: 'application/pdf', content: pdf }] : [],
   });
@@ -589,17 +600,7 @@ app.get('/api/admin/outbox/:id.html', requireAuth, requireRole('founder', 'admin
   res.send(o.html || '<p>No body</p>');
 });
 
-// ---------- admin: companies (founder only) ----------
-app.get('/api/admin/companies', requireAuth, requireRole('founder'), (req, res) => {
-  res.json(db.companies.map((c) => ({
-    ...c,
-    userCount: db.users.filter((u) => u.companyId === c.id).length,
-    projectCount: db.projects.filter((p) => p.companyId === c.id).length,
-    eventCount: db.events.filter((e) => e.companyId === c.id).length,
-  })));
-});
-
-// ---------- admin: exports ----------
+// ---------- admin: CSV exports ----------
 app.get('/api/admin/export/events.csv', requireAuth, requireRole('founder', 'admin'), (req, res) => {
   const companyIds = req.user.role === 'founder' ? db.companies.map((c) => c.id) : [req.user.companyId];
   const list = db.events.filter((e) => companyIds.includes(e.companyId)).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -674,6 +675,11 @@ app.get('/r/:token', (req, res) => {
     </div>
   </div>
 </div></body></html>`);
+});
+
+// ---------- health check (for deployment uptime monitoring) ----------
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, service: 'boundbuild', version: '0.1.0', time: now() });
 });
 
 // ---------- SPA fallback ----------
