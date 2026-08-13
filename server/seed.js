@@ -37,27 +37,27 @@ function seed() {
 
   const company = {
     id: id('cmp'),
-    name: 'Harbourline Construction Ltd',
+    name: 'Kowhai Construction Ltd',
     industry: 'Commercial & residential builder',
     pilotStatus: 'active',
     createdAt: daysAgo(40),
   };
   db.companies.push(company);
 
-  const founder = mkUser('Alex Rowe', 'founder@boundbuild.app', 'founder', company.id);
-  const mike = mkUser('Mike Tarrant', 'mike@harbourline.nz', 'user', company.id);      // foreman
-  const pete = mkUser('Pete Hanrahan', 'pete@harbourline.nz', 'user', company.id);     // foreman
-  const jess = mkUser('Jess Whitcombe', 'jess@harbourline.nz', 'admin', company.id);   // QS
+  const founder = mkUser('Jordan Lee', 'founder@boundbuild.app', 'founder', company.id);
+  const mike = mkUser('Chris Taylor', 'foreman1@kowhaiconstruction.co.nz', 'user', company.id);      // foreman
+  const pete = mkUser('Sam Wilson', 'foreman2@kowhaiconstruction.co.nz', 'user', company.id);     // foreman
+  const jess = mkUser('Alex Morgan', 'qs@kowhaiconstruction.co.nz', 'admin', company.id);   // QS
   db.users.push(founder, mike, pete, jess);
 
   const p1 = {
-    id: id('prj'), name: 'Riverside Terraces', location: 'Waimakariri, Christchurch',
-    companyId: company.id, defaultRecipients: ['jess@harbourline.nz'],
+    id: id('prj'), name: 'Rimu Ridge Terraces', location: 'Waimakariri, Christchurch',
+    companyId: company.id, defaultRecipients: ['qs@kowhaiconstruction.co.nz'],
     createdBy: founder.id, createdAt: daysAgo(35),
   };
   const p2 = {
-    id: id('prj'), name: 'Bishopdale Retail Fitout', location: 'Bishopdale, Christchurch',
-    companyId: company.id, defaultRecipients: ['jess@harbourline.nz'],
+    id: id('prj'), name: 'Tui Lane Fitout', location: 'Bishopdale, Christchurch',
+    companyId: company.id, defaultRecipients: ['qs@kowhaiconstruction.co.nz'],
     createdBy: founder.id, createdAt: daysAgo(30),
   };
   db.projects.push(p1, p2);
@@ -89,7 +89,7 @@ function seed() {
       confidence: 94, fieldsChangedAfterDraft: 1,
       audit: [
         { action: 'Captured', by: { id: mike.id, name: mike.name }, at: daysAgo(12, 8, 14), detail: 'Voice note 0:58 + 2 photos' },
-        { action: 'Dispatched to QS', by: { id: mike.id, name: mike.name }, at: daysAgo(12, 9, 2), detail: 'jess@harbourline.nz' },
+        { action: 'Dispatched to QS', by: { id: mike.id, name: mike.name }, at: daysAgo(12, 9, 2), detail: 'qs@kowhaiconstruction.co.nz' },
         { action: 'Reviewed', by: { id: jess.id, name: jess.name }, at: daysAgo(11, 15, 30), detail: 'Record accepted — added to claim register' },
       ],
     }),
@@ -105,7 +105,7 @@ function seed() {
       confidence: 91, fieldsChangedAfterDraft: 0,
       audit: [
         { action: 'Captured', by: { id: mike.id, name: mike.name }, at: daysAgo(9, 7, 55), detail: 'Voice note 0:41 + 1 photo' },
-        { action: 'Dispatched to QS', by: { id: mike.id, name: mike.name }, at: daysAgo(9, 8, 40), detail: 'jess@harbourline.nz' },
+        { action: 'Dispatched to QS', by: { id: mike.id, name: mike.name }, at: daysAgo(9, 8, 40), detail: 'qs@kowhaiconstruction.co.nz' },
         { action: 'Reviewed', by: { id: jess.id, name: jess.name }, at: daysAgo(8, 10, 5), detail: 'Weather clause — notifying client for EOT' },
       ],
     }),
@@ -120,7 +120,7 @@ function seed() {
       confidence: 87, fieldsChangedAfterDraft: 2,
       audit: [
         { action: 'Captured', by: { id: pete.id, name: pete.name }, at: daysAgo(7, 10, 22), detail: 'Voice note 1:02' },
-        { action: 'Dispatched to QS', by: { id: pete.id, name: pete.name }, at: daysAgo(7, 11, 5), detail: 'jess@harbourline.nz' },
+        { action: 'Dispatched to QS', by: { id: pete.id, name: pete.name }, at: daysAgo(7, 11, 5), detail: 'qs@kowhaiconstruction.co.nz' },
       ],
     }),
     ev({
@@ -135,7 +135,7 @@ function seed() {
       confidence: 90, fieldsChangedAfterDraft: 1,
       audit: [
         { action: 'Captured', by: { id: mike.id, name: mike.name }, at: daysAgo(5, 13, 40), detail: 'Voice note 0:47 + 1 photo' },
-        { action: 'Dispatched to QS', by: { id: mike.id, name: mike.name }, at: daysAgo(5, 14, 12), detail: 'jess@harbourline.nz' },
+        { action: 'Dispatched to QS', by: { id: mike.id, name: mike.name }, at: daysAgo(5, 14, 12), detail: 'qs@kowhaiconstruction.co.nz' },
         { action: 'Reviewed', by: { id: jess.id, name: jess.name }, at: daysAgo(4, 9, 20), detail: 'Requesting supplier substitution docs' },
       ],
     }),
@@ -150,7 +150,7 @@ function seed() {
       confidence: 92, fieldsChangedAfterDraft: 0,
       audit: [
         { action: 'Captured', by: { id: pete.id, name: pete.name }, at: daysAgo(3, 11, 18), detail: 'Voice note 0:36' },
-        { action: 'Dispatched to QS', by: { id: pete.id, name: pete.name }, at: daysAgo(3, 11, 52), detail: 'jess@harbourline.nz' },
+        { action: 'Dispatched to QS', by: { id: pete.id, name: pete.name }, at: daysAgo(3, 11, 52), detail: 'qs@kowhaiconstruction.co.nz' },
       ],
     }),
     ev({
@@ -219,12 +219,12 @@ function seed() {
   for (const e of db.events.filter((x) => x.sentAt)) {
     const token = crypto.randomBytes(16).toString('hex');
     db.dispatches.push({
-      id: id('dsp'), eventId: e.id, to: 'jess@harbourline.nz', method: 'email',
+      id: id('dsp'), eventId: e.id, to: 'qs@kowhaiconstruction.co.nz', method: 'email',
       status: 'sent', token, sentAt: e.sentAt, error: null,
     });
     db.outbox.push({
       id: id('out'), dispatchId: db.dispatches[db.dispatches.length - 1].id, eventId: e.id,
-      to: 'jess@harbourline.nz',
+      to: 'qs@kowhaiconstruction.co.nz',
       subject: `[BoundBuild] ${e.type} — ${e.title}`,
       html: '<seeded>', eml: '<seeded>', sentAt: e.sentAt, method: 'email',
     });
