@@ -229,9 +229,9 @@ const App = (() => {
         <div class="demo-box">
           <div class="demo-title">${I.sparkle} Pilot demo — one tap</div>
           <div class="demo-users">
-            <button class="demo-user" data-email="mike@harbourline.nz"><span class="avatar">MT</span><span><b>Mike Tarrant</b><small>Foreman — capture & dispatch</small></span></button>
-            <button class="demo-user" data-email="jess@harbourline.nz"><span class="avatar">JW</span><span><b>Jess Whitcombe</b><small>QS — review & pilot console</small></span></button>
-            <button class="demo-user" data-email="founder@boundbuild.app"><span class="avatar">AR</span><span><b>Alex Rowe</b><small>Founder — all companies</small></span></button>
+            <button class="demo-user" data-email="foreman1@kowhaiconstruction.co.nz"><span class="avatar">CT</span><span><b>Chris Taylor</b><small>Foreman — capture & dispatch</small></span></button>
+            <button class="demo-user" data-email="qs@kowhaiconstruction.co.nz"><span class="avatar">AM</span><span><b>Alex Morgan</b><small>QS — review & pilot console</small></span></button>
+            <button class="demo-user" data-email="founder@boundbuild.app"><span class="avatar">JL</span><span><b>Jordan Lee</b><small>Founder — all companies</small></span></button>
           </div>
           <div class="demo-pw">All demo accounts use password <code>boundbuild-demo</code></div>
         </div>
@@ -296,6 +296,7 @@ const App = (() => {
       transcript: '', note: '', audio: null, media: [], draft: null,
       sessionId: null, startedAt: Date.now(), recording: false, liveText: '',
       fieldsChanged: 0,
+      recordMode: 'auto', // 'auto' | 'media' | 'webaudio' — auto-switches after empty capture
     };
     return captureRender();
   }
@@ -329,6 +330,7 @@ const App = (() => {
             <span class="rec-pulse"></span><span class="rec-inner">${I.mic}</span>
           </button>
           <div class="rec-timer" id="rec-timer">${c.recording ? '00:00' : 'Tap to record'}</div>
+          <div class="rec-meter-wrap"><div class="rec-meter" id="rec-meter"></div></div>
           ${speech ? `<div class="rec-live" id="rec-live">${c.liveText ? esc(c.liveText) : 'Live captioning on — speak naturally…'}</div>` : ''}
         </div>` : `
         <div class="notice err">${I.alert} Microphone isn't available here (this preview blocks mic access). You can still capture — type the description or load a sample voice note.</div>
@@ -415,42 +417,53 @@ const App = (() => {
         if (!c.recording) {
           try {
             await Recorder.start({
+              forceMode: c.recordMode,
+              onLevel: (v) => { const el = $('#rec-meter'); if (el) el.style.width = Math.round(v * 100) + '%'; },
               onLive: (t) => { c.liveText = t; const el = $('#rec-live'); if (el) el.textContent = t || 'Live captioning on — speak naturally…'; },
               onEnd: async ({ blob, mime, transcript, bytes }) => {
+                const empty = !blob || !blob.size;
+                const tiny = !empty && blob.size < 1000;
+                if (empty || tiny) {
+                  // No usable audio captured. If we haven't already, switch to the
+                  // WebAudio WAV recorder (works where MediaRecorder yields nothing)
+                  // and ask for one more take.
+                  if (empty && c.recordMode !== 'webaudio') {
+                    c.recordMode = 'webaudio';
+                    toast('No audio captured — tap record again (compatibility recorder will be used)', 'warn');
+                    refreshCapture();
+                    return;
+                  }
+                  if (tiny) {
+                    toast('Recording was too short or silent — try a longer note, or type the description', 'warn');
+                    refreshCapture();
+                    return;
+                  }
+                  toast('Mic captured no audio — check microphone permission, or type the description', 'warn');
+                  c.step = 'note'; refreshCapture();
+                  return;
+                }
                 timer.textContent = 'Uploading audio…';
                 const ext = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : 'webm';
                 let serverTranscript = null;
                 let sttError = null;
-                if (!blob || !blob.size) {
-                  // Zero bytes captured — the mic/recorder produced nothing.
-                  toast('No audio was captured — tap record, speak, then stop (mic needs a second to start)', 'warn');
-                } else if (blob.size < 1000) {
-                  // Suspiciously tiny — likely a silent/empty capture.
-                  toast('Recording was too short or silent — try a longer note, or type the description', 'warn');
-                } else {
+                try {
+                  const up = await API.uploadMedia('audio', blob, ext);
+                  c.audio = { mediaId: up.id, url: up.url, mime };
+                  // Server-side STT when configured (phone → BoundBuild → STT API);
+                  // otherwise this returns provider:'browser' and we fall back below.
+                  timer.textContent = 'Transcribing…';
                   try {
-                    const up = await API.uploadMedia('audio', blob, ext);
-                    c.audio = { mediaId: up.id, url: up.url, mime };
-                    // Server-side STT when configured (phone → BoundBuild → STT API);
-                    // otherwise this returns provider:'browser' and we fall back below.
-                    timer.textContent = 'Transcribing…';
-                    try {
-                      const r = await API.transcribe(up.id);
-                      if (r && r.transcript) serverTranscript = r.transcript;
-                      else if (r && r.error) sttError = r.error;
-                    } catch (e) { sttError = e.message || 'transcription request failed'; }
-                  } catch (e) {
-                    toast('Audio upload failed (offline?) — continuing with your text', 'warn');
-                  }
+                    const r = await API.transcribe(up.id);
+                    if (r && r.transcript) serverTranscript = r.transcript;
+                    else if (r && r.error) sttError = r.error;
+                  } catch (e) { sttError = e.message || 'transcription request failed'; }
+                } catch (e) {
+                  toast('Audio upload failed (offline?) — continuing with your text', 'warn');
                 }
                 c.transcript = (serverTranscript || transcript || '').trim();
                 if (!serverTranscript && !c.transcript) {
                   if (sttError) {
                     toast('Voice transcription failed: ' + sttError.slice(0, 140) + ' — you can type the description below', 'warn');
-                  } else if (!blob || !blob.size) {
-                    toast('No audio captured — try again or type the description', 'warn');
-                  } else if (blob.size < 1000) {
-                    toast('Recording was too short or silent — try a longer note', 'warn');
                   } else {
                     toast('No transcription available on this device — type the description below', 'warn');
                   }
@@ -730,7 +743,7 @@ const App = (() => {
         <div class="section">
           <div class="section-head"><h2>New project</h2></div>
           <form id="project-form" class="form">
-            <div class="field"><label>Project name *</label><input name="name" required maxlength="80" placeholder="e.g. Riverside Terraces"></div>
+            <div class="field"><label>Project name *</label><input name="name" required maxlength="80" placeholder="e.g. Rimu Ridge Terraces"></div>
             <div class="field"><label>Location</label><input name="location" maxlength="120" placeholder="e.g. Waimakariri, Christchurch"></div>
             <div class="field"><label>Default dispatch recipients (comma separated emails)</label><input name="recipients" type="text" placeholder="qs@company.co.nz, pm@company.co.nz"></div>
             <button class="btn primary block" type="submit">${I.plus} Create project</button>
