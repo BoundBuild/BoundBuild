@@ -156,6 +156,7 @@ app.post('/api/projects', requireAuth, requireRole('founder', 'admin'), (req, re
 
 // ---------- uploads (audio + photos) ----------
 app.post('/api/upload', requireAuth, express.raw({ type: '*/*', limit: '80mb' }), (req, res) => {
+  if (!req.body || !req.body.length) return res.status(400).json({ error: 'Upload was empty — please retry the recording' });
   const kind = req.query.kind === 'audio' ? 'audio' : 'image';
   const ext = (req.query.ext || (kind === 'audio' ? 'webm' : 'jpg')).replace(/[^a-z0-9]/gi, '').slice(0, 8);
   const fileId = id(kind === 'audio' ? 'aud' : 'img');
