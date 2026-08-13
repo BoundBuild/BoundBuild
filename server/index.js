@@ -24,6 +24,7 @@ seed();
 const db = load();
 
 app.use(express.json({ limit: '25mb' }));
+require('./pilot')(app);
 app.use('/media', express.static(UPLOADS_DIR));
 app.use('/media', express.static(path.join(__dirname, '..', 'public'))); // demo media live in public/demo
 app.use(express.static(path.join(__dirname, '..', 'public'), { index: 'index.html' }));
