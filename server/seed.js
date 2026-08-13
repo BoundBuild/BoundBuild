@@ -44,7 +44,7 @@ function seed() {
   };
   db.companies.push(company);
 
-  const founder = mkUser('Jordan Lee', 'founder@boundbuild.app', 'founder', company.id);
+  const founder = mkUser('Jordan Lee', 'founder@boundbuild.app', 'site manager', company.id);
   const mike = mkUser('Chris Taylor', 'foreman1@kowhaiconstruction.co.nz', 'user', company.id);      // foreman
   const pete = mkUser('Sam Wilson', 'foreman2@kowhaiconstruction.co.nz', 'user', company.id);     // foreman
   const jess = mkUser('Alex Morgan', 'qs@kowhaiconstruction.co.nz', 'admin', company.id);   // QS
