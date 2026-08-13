@@ -20,7 +20,7 @@ const ok = (name, cond) => { console.log((cond ? '✔' : '✘ FAIL') + ' ' + nam
 
   // ---- demo login as foreman ----
   await page.waitForTimeout(500); // let the login view mount bind its handlers
-  await page.click('.demo-user[data-email="mike@harbourline.nz"]');
+  await page.click('.demo-user[data-email="foreman1@kowhaiconstruction.co.nz"]');
   await page.waitForSelector('.record-btn', { timeout: 8000 });
   ok('home renders after login', await page.isVisible('.record-btn'));
   ok('bottom nav visible', await page.isVisible('#bottomnav'));
@@ -61,7 +61,7 @@ const ok = (name, cond) => { console.log((cond ? '✔' : '✘ FAIL') + ' ' + nam
   // ---- dispatch from success screen ----
   await page.click('#done-dispatch');
   await page.waitForSelector('#dsp-to', { timeout: 5000 });
-  ok('dispatch modal opens with prefilled recipient', (await page.inputValue('#dsp-to')) === 'jess@harbourline.nz');
+  ok('dispatch modal opens with prefilled recipient', (await page.inputValue('#dsp-to')) === 'qs@kowhaiconstruction.co.nz');
   await page.click('#dsp-send');
   await page.waitForSelector('.dsp-ok, .dsp-err', { timeout: 10000 });
   const dsp = await page.textContent('.dsp-ok, .dsp-err');
@@ -105,7 +105,7 @@ const ok = (name, cond) => { console.log((cond ? '✔' : '✘ FAIL') + ' ' + nam
   await page.click('#btn-logout');
   await page.waitForSelector('#login-form', { timeout: 5000 });
   await page.waitForTimeout(500); // let the login view mount bind its handlers
-  await page.click('.demo-user[data-email="jess@harbourline.nz"]');
+  await page.click('.demo-user[data-email="qs@kowhaiconstruction.co.nz"]');
   await page.waitForSelector('.topbar-btn[href="#/admin"]', { timeout: 8000 });
   ok('QS sees Pilot console link', true);
   await page.click('.topbar-btn[href="#/admin"]');
