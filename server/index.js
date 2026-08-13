@@ -189,7 +189,7 @@ app.post('/api/transcribe', requireAuth, async (req, res) => {
   if (!mediaId) return res.status(400).json({ error: 'mediaId is required' });
   const m = db.media.find((x) => x.id === mediaId);
   if (!m || m.kind !== 'audio') return res.status(400).json({ error: 'Audio media not found' });
-  if (m.uploadedBy !== req.user.id && req.user.role === 'user') {
+  if (m.uploadedBy !== req.user.id && (req.user.role === 'user' || req.user.role === 'site manager')) {
     return res.status(403).json({ error: 'Not your recording' });
   }
   const filePath = path.join(UPLOADS_DIR, String(m.filename));
@@ -475,7 +475,7 @@ app.post('/api/admin/users', requireAuth, requireRole('founder', 'admin'), (req,
   const user = {
     id: id('usr'), name, email: email.toLowerCase(), salt,
     passwordHash: hashPassword(password, salt),
-    role: ['user', 'admin'].includes(role) ? role : 'user',
+    role: ['user', 'site manager', 'admin'].includes(role) ? role : 'user',
     companyId, active: true, createdAt: now(), lastSeenAt: null,
   };
   db.users.push(user);
