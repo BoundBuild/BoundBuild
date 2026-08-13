@@ -1,4 +1,4 @@
-
+[README.md](https://github.com/user-attachments/files/31011931/README.md)
 # BoundBuild — MVP
 
 > **Capture. Document. Get Paid.**
@@ -25,8 +25,8 @@ site events, capture sessions, dispatches and analytics on first boot (`data/db.
 
 | Account | Role | What to try |
 |---|---|---|
-| `mike@harbourline.nz` | Foreman (user) | Capture → AI draft → save → dispatch |
-| `jess@harbourline.nz` | QS (admin) | Pilot console, outbox, team, exports |
+| `foreman1@kowhaiconstruction.co.nz` | Foreman (user) | Capture → AI draft → save → dispatch |
+| `qs@kowhaiconstruction.co.nz` | QS (admin) | Pilot console, outbox, team, exports |
 | `founder@boundbuild.app` | Founder | Cross-company view (Companies tab) |
 
 The login screen has one-tap demo logins. **Registration creates a brand-new company** (pilot bootstrap).
@@ -166,4 +166,4 @@ per-project roles. (Server-side STT and PDF dispatch are already in the MVP.)
 
 ---
 
-*BoundBuild MVP v0.1.0 — built to the MVP Builder Brief. Capture. Document. Get Paid.
+*BoundBuild MVP v0.1.0 — built to the MVP Builder Brief. Capture. Document. Get Paid.*
