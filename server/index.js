@@ -24,6 +24,7 @@ seed();
 const db = load();
 
 app.use(express.json({ limit: '25mb' }));
+require('./pilot')(app);
 require('./pilot')(app);   // ← move it here, after the JSON parser
 // ---------- boot ----------
 seed();
