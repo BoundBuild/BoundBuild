@@ -124,6 +124,20 @@ function lineChart(data, { height = 120, color = '#4CC38A' } = {}) {
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block;"><path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>${dots}${labels}</svg>`;
 }
 
+function sparkline(data, { height = 34, color = '#FF6A00' } = {}) {
+  // Tiny 30-day activity sparkline (bars). Each bar = events + captures that day.
+  const w = 320, h = height;
+  const vals = data.map((d) => d.events + d.captures + (d.dispatches || 0));
+  const max = Math.max(1, ...vals);
+  const bw = w / vals.length;
+  let bars = '';
+  vals.forEach((v, i) => {
+    const bh = Math.max(1.5, (v / max) * (h - 2));
+    bars += `<rect x="${(i * bw).toFixed(1)}" y="${(h - bh).toFixed(1)}" width="${Math.max(2, bw - 1.5).toFixed(1)}" height="${bh.toFixed(1)}" rx="1" fill="${v ? color : '#23282E'}"><title>${esc(data[i].label)}: ${v} activity</title></rect>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px;display:block;">${bars}</svg>`;
+}
+
 function downloadFile(name, content, mime) {
   const a = document.createElement('a');
   const blob = content instanceof Blob ? content : new Blob([content], { type: mime });

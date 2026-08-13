@@ -231,7 +231,6 @@ const App = (() => {
           <div class="demo-users">
             <button class="demo-user" data-email="foreman1@kowhaiconstruction.co.nz"><span class="avatar">CT</span><span><b>Chris Taylor</b><small>Foreman — capture & dispatch</small></span></button>
             <button class="demo-user" data-email="qs@kowhaiconstruction.co.nz"><span class="avatar">AM</span><span><b>Alex Morgan</b><small>QS — review & pilot console</small></span></button>
-            <button class="demo-user" data-email="founder@boundbuild.app"><span class="avatar">JL</span><span><b>Jordan Lee</b><small>Site Manager — capture &amp; dispatch</small></span></button>
           </div>
           <div class="demo-pw">All demo accounts use password <code>boundbuild-demo</code></div>
         </div>
@@ -793,7 +792,7 @@ const App = (() => {
     const m = await API.metrics();
     const em = await API.emailStatus();
     const isFounder = state.user.role === 'founder';
-    const tabs = [['overview', 'Overview'], ['outbox', 'Outbox'], ['team', 'Team'], ['exports', 'Exports']];
+    const tabs = [['overview', 'Overview'], ['usage', 'Usage'], ['outbox', 'Outbox'], ['team', 'Team'], ['exports', 'Exports']];
     if (isFounder) tabs.push(['companies', 'Companies']);
     const tab = (location.hash.split('?')[1] || 'overview');
     const met = m.metrics;
@@ -802,6 +801,7 @@ const App = (() => {
         <div class="page-head"><a class="icon-btn" href="#/home">${I.back}</a><h1>Pilot console</h1><span class="page-count">${esc(state.company ? state.company.name : 'All companies')}</span></div>
         <div class="chip-row">${tabs.map(([id, label]) => `<a class="chip-btn ${tab === id ? 'active' : ''}" href="#/admin?${id}">${label}</a>`).join('')}</div>
         ${tab === 'overview' ? adminOverview(m, em) : ''}
+        ${tab === 'usage' ? '<div id="usage-wrap"><div class="page-loading">Loading…</div></div>' : ''}
         ${tab === 'outbox' ? '<div id="outbox-wrap"><div class="page-loading">Loading…</div></div>' : ''}
         ${tab === 'team' ? '<div id="team-wrap"><div class="page-loading">Loading…</div></div>' : ''}
         ${tab === 'exports' ? adminExports(m) : ''}
@@ -1088,6 +1088,7 @@ const App = (() => {
         } catch (e) { toast(e.message, 'err'); }
         testBtn.disabled = false; testBtn.textContent = 'Send test email';
       });
+      if (tab === 'usage') mountUsage();
       if (tab === 'outbox') mountOutbox();
       if (tab === 'team') mountTeam();
       if (tab === 'companies') mountCompanies();
@@ -1169,6 +1170,41 @@ const App = (() => {
       ${list.map((c) => `
         <div class="settings-row"><div><b>${esc(c.name)}</b><div class="muted">${c.userCount} users · ${c.projectCount} projects · ${c.eventCount} events · Pilot: ${esc(c.pilotStatus)}</div></div>
         <span class="chip" style="color:#4CC38A;border-color:#4CC38A55;background:#4CC38A1f;">${esc(c.pilotStatus)}</span></div>`).join('')}
+      </div>`;
+  }
+
+  async function mountUsage() {
+    const wrap = $('#usage-wrap');
+    const u = await API.usage();
+    const companies = (u.companies || []).slice().sort((a, b) => {
+      const t = (c) => c.lastActiveAt ? new Date(c.lastActiveAt).getTime() : 0;
+      return t(b) - t(a);
+    });
+    const rows = companies.map((c) => {
+      const badge = c.quiet
+        ? `<span class="chip" style="color:#FFB020;border-color:#FFB02055;background:#FFB0201f;">QUIET</span>`
+        : `<span class="chip" style="color:#4CC38A;border-color:#4CC38A55;background:#4CC38A1f;">ACTIVE</span>`;
+      const last = c.lastActiveAt ? timeAgo(c.lastActiveAt) : 'never';
+      return `
+        <div class="usage-company">
+          <div class="usage-head">
+            <div><b>${esc(c.name)}</b><div class="muted">${esc(c.pilotStatus || 'pilot')} · ${c.users.active7}/${c.users.total} users active this week</div></div>
+            <div class="usage-badges">${badge}<span class="usage-last">last active ${esc(last)}</span></div>
+          </div>
+          <div class="usage-stats">
+            <div class="u-stat"><b>${c.events.total}</b><span>events</span></div>
+            <div class="u-stat"><b>${c.events.last30}</b><span>events 30d</span></div>
+            <div class="u-stat"><b>${c.captures.last30}</b><span>captures 30d</span></div>
+            <div class="u-stat"><b>${c.dispatches.total}</b><span>dispatches</span></div>
+          </div>
+          <div class="usage-spark">${sparkline(c.activityByDay)}</div>
+        </div>`;
+    }).join('');
+    wrap.innerHTML = `
+      <div class="section">
+        <div class="section-head"><h2>Pilot builder usage</h2><span class="page-count">${companies.length} builders</span></div>
+        <div class="muted" style="margin-bottom:12px;">How often each builder's team is using the app — events + captures per day over the last 30 days. Sorted by most recently active.</div>
+        ${rows || '<div class="empty"><b>No pilot companies yet</b><span>Registered builders appear here with their usage.</span></div>'}
       </div>`;
   }
 

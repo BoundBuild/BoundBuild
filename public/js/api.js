@@ -95,6 +95,7 @@ const API = (() => {
     attachMedia: (mediaIds, eventId) => json('POST', '/api/media/attach', { mediaIds, eventId }),
 
     metrics: () => json('GET', '/api/admin/metrics'),
+    usage: () => json('GET', '/api/admin/usage'),
     emailStatus: () => json('GET', '/api/admin/email-status'),
     emailTest: (to) => json('POST', '/api/admin/email-test', { to }),
     companies: () => json('GET', '/api/admin/companies'),
