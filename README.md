@@ -68,10 +68,10 @@ Swap the mocks for real credentials by filling `.env`.
 - **Dispatch** — branded **Commercial Event Record PDF** + branded HTML email to the nominated
   recipient (QS/PM/office), secure public recipient link with photos, `.eml` export (multipart,
   PDF included), outbox with preview and PDF download. Event stays in the ledger.
-- **Email delivery** — real transactional email via **Resend** (API key, no SMTP server needed)
-  or any **SMTP** provider (Postmark, SES, Mailgun…). Without credentials, dispatches queue to
-  the outbox with the email body, PDF and `.eml` — add a key and delivery goes live with no
-  code changes. The Pilot console shows live config status and a **Send test email** button.
+- **Email delivery** — real transactional email via **SMTP** (Postmark is the production
+  provider; any SMTP host works). Without SMTP settings, dispatches queue to the outbox with
+  the email body, PDF and `.eml` — add SMTP settings and delivery goes live with no code
+  changes. The Pilot console shows live config status and a **Send test email** button.
 - **Server-side speech-to-text** — phone mic → BoundBuild server → STT API (OpenAI-compatible
   Whisper endpoint). Configure with `STT_PROVIDER=whisper` + `OPENAI_API_KEY`; falls back to
   in-browser transcription when unset, so capture never breaks either way.
@@ -103,7 +103,7 @@ self-serve onboarding. (Registration is a deliberate pilot bootstrap, not self-s
 | Auth | scrypt-hashed passwords + server-side session tokens (HttpOnly cookie/Bearer) | No external auth dependency for pilots; roles founder/admin/user. |
 | Speech→text | **Server-side STT (Whisper API) when configured**; browser Web Speech API as fallback | Phone mic → BoundBuild → STT API is the pilot path (`STT_PROVIDER=whisper`); zero-key browser fallback keeps capture working anywhere. |
 | AI structuring | **heuristic-v1 engine shipped** + optional LLM path | Works today with no keys and full transparency; set `OPENAI_API_KEY` and the same request is routed to `gpt-4o-mini` with a strict JSON schema — same shape, same UI. |
-| Email | **Resend (API) or SMTP**, branded HTML + **PDF attachment** | One Resend key = live delivery (free tier covers pilots). No key → outbox mode with `.eml`/PDF/link; Pilot console has a test-delivery button. |
+| Email | **SMTP (Postmark)**, branded HTML + **PDF attachment** | Postmark SMTP = live delivery. No SMTP config → outbox mode with `.eml`/PDF/link; Pilot console has a test-delivery button. |
 | QS output | **A4 Commercial Event Record PDF** (pdfkit) + branded email + recipient web page | Full record: branding, ref, timestamps, type, location, instructed-by, AI summary, cost/time impacts, photos, submitter, status, audit trail. |
 
 ### Decision-sheet answers (brief §12)
@@ -113,7 +113,7 @@ self-serve onboarding. (Registration is a deliberate pilot bootstrap, not self-s
 | Mobile stack | Mobile-first responsive web app + PWA manifest/SW. Capacitor wrapper later if pilots demand store presence. |
 | Backend/db/storage | Express + JSON store → Postgres + S3 on the roadmap. |
 | Speech-to-text / AI | Browser STT now; heuristic extractor now; `OPENAI_API_KEY` opt-in for LLM drafts. |
-| Dispatch format | A4 branded Commercial Event Record **PDF attached to a branded HTML email** via Resend or SMTP + secure `/r/:token` recipient page + `.eml` download. No credentials → outbox mode (everything still works); add one key to go live. |
+| Dispatch format | A4 branded Commercial Event Record **PDF attached to a branded HTML email** via SMTP (Postmark) + secure `/r/:token` recipient page + `.eml` download. No credentials → outbox mode (everything still works); add SMTP settings to go live. |
 | Offline v1 vs v1.1 | v1: queue-and-sync for saves (photos compressed, audio uploaded live when possible). v1.1: full offline capture incl. audio via IndexedDB + SW background sync. |
 | Who creates projects/recipients | Company admins (and founder). Recipients default per project; overridable at dispatch. |
 | Event status model | `draft → sent → reviewed`, each transition audit-logged with user + timestamp. |
@@ -151,7 +151,7 @@ server/ai.js           heuristic structuring + optional LLM path
 server/stt.js          server-side speech-to-text (Whisper API, fallback browser)
 server/pdf.js          branded A4 Commercial Event Record PDF (pdfkit)
 server/emailTemplate.js branded dispatch email
-server/mailer.js       Resend / SMTP / outbox with PDF attachments + .eml
+server/mailer.js       SMTP (Postmark) / outbox with PDF attachments + .eml
 server/seed.js         demo pilot data
 public/js/app.js       SPA: router, views, capture flow, admin console
 public/js/api.js       API client + offline queue
