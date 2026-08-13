@@ -25,6 +25,31 @@ const ok = (name, cond, extra = '') => {
 };
 
 function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+/** Build a minimal valid WAV file (16-bit PCM sine tone) as a Buffer. */
+function buildTestWav(sampleRate, seconds) {
+  const numSamples = Math.floor(sampleRate * seconds);
+  const dataSize = numSamples * 2;
+  const buf = Buffer.alloc(44 + dataSize);
+  buf.write('RIFF', 0, 'ascii');
+  buf.writeUInt32LE(36 + dataSize, 4);
+  buf.write('WAVE', 8, 'ascii');
+  buf.write('fmt ', 12, 'ascii');
+  buf.writeUInt32LE(16, 16);      // fmt chunk size
+  buf.writeUInt16LE(1, 20);       // PCM
+  buf.writeUInt16LE(1, 22);       // mono
+  buf.writeUInt32LE(sampleRate, 24);
+  buf.writeUInt32LE(sampleRate * 2, 28); // byte rate
+  buf.writeUInt16LE(2, 32);       // block align
+  buf.writeUInt16LE(16, 34);      // bits per sample
+  buf.write('data', 36, 'ascii');
+  buf.writeUInt32LE(dataSize, 40);
+  for (let i = 0; i < numSamples; i++) {
+    const s = Math.round(3000 * Math.sin(2 * Math.PI * 440 * i / sampleRate));
+    buf.writeInt16LE(s, 44 + i * 2);
+  }
+  return buf;
+}
 async function waitFor(url, tries = 40) {
   for (let i = 0; i < tries; i++) {
     try {
@@ -75,19 +100,23 @@ async function waitFor(url, tries = 40) {
     };
 
     /* 1. auth */
-    const login = await j('POST', '/api/auth/login', { email: 'mike@harbourline.nz', password: 'boundbuild-demo' });
+    const login = await j('POST', '/api/auth/login', { email: 'foreman1@kowhaiconstruction.co.nz', password: 'boundbuild-demo' });
     ok('login issues a real session token', login.status === 200 && !!login.data.token);
     const token = login.data.token;
     // admin endpoints need a founder/admin session (role enforcement is real)
-    const jessLogin = await j('POST', '/api/auth/login', { email: 'jess@harbourline.nz', password: 'boundbuild-demo' });
+    const jessLogin = await j('POST', '/api/auth/login', { email: 'qs@kowhaiconstruction.co.nz', password: 'boundbuild-demo' });
     const adminToken = jessLogin.data.token;
     const jAdmin = (method, p, body) => j(method, p, body, adminToken);
 
     /* 2. audio upload → server-side STT */
+    // Build a real (valid) WAV in JS — a sine tone. Deliberately upload it
+    // mislabelled as .webm: the server's ffmpeg normalization must convert it
+    // to a clean WAV before Whisper sees it.
+    const wav = buildTestWav(16000, 0.5);
     const upRes = await fetch(`${BASE}/api/upload?kind=audio&ext=webm`, {
       method: 'POST',
       headers: { 'Content-Type': 'audio/webm', Authorization: 'Bearer ' + token },
-      body: Buffer.from('FAKE-WEBM-AUDIO-BYTES-FOR-TEST'),
+      body: Buffer.from(wav),
     });
     const up = await upRes.json();
     ok('audio upload persisted', upRes.status === 200 && !!up.id && up.kind === 'audio', up.url || '');
@@ -134,7 +163,11 @@ async function waitFor(url, tries = 40) {
       ok('attachment is a real PDF (%PDF magic)', parsed.attachments && parsed.attachments[0].pdfMagic === '%PDF');
     }
     const sttLine = mockLog.split('\n').filter((l) => l.includes('"type":"stt"')).pop();
-    ok('mock Whisper received audio bytes', !!sttLine);
+    ok('mock Whisper received audio', !!sttLine);
+    if (sttLine) {
+      const sp = JSON.parse(sttLine);
+      ok('audio was normalized to WAV before Whisper (ffmpeg fix)', sp.filename === 'recording.wav' && sp.magic === 'RIFF', JSON.stringify(sp));
+    }
 
     /* 6. PDF endpoint + .eml with attachment */
     const pdfRes = await fetch(`${BASE}/api/events/${evt.data.id}/pdf`, { headers: { Authorization: 'Bearer ' + token } });
@@ -160,7 +193,7 @@ async function waitFor(url, tries = 40) {
     /* 8. cookie auth set for direct downloads */
     const loginRes = await fetch(`${BASE}/api/auth/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'jess@harbourline.nz', password: 'boundbuild-demo' }),
+      body: JSON.stringify({ email: 'qs@kowhaiconstruction.co.nz', password: 'boundbuild-demo' }),
       redirect: 'manual',
     });
     ok('login sets session cookie', (loginRes.headers.get('set-cookie') || '').includes('bbsid='));
