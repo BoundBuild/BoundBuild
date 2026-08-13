@@ -51,7 +51,7 @@ function seed() {
   if (!process.env.BB_FOUNDER_PASSWORD) {
     console.warn('⚠  BB_FOUNDER_PASSWORD not set — founder password generated randomly. Set BB_FOUNDER_PASSWORD and reseed to control it.');
   }
-  const founder = mkUser('BoundBuild', 'founder@boundbuild.co.nz', 'founder', company.id, founderPassword);
+  const founder = mkUser('BoundBuild', 'founder@boundbuild.co.nz', 'founder', null, founderPassword);
   const mike = mkUser('Chris Taylor', 'foreman1@kowhaiconstruction.co.nz', 'user', company.id);      // foreman
   const pete = mkUser('Sam Wilson', 'foreman2@kowhaiconstruction.co.nz', 'user', company.id);     // foreman
   const jess = mkUser('Alex Morgan', 'qs@kowhaiconstruction.co.nz', 'admin', company.id);   // QS
