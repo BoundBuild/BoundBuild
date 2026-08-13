@@ -231,7 +231,7 @@ const App = (() => {
           <div class="demo-users">
             <button class="demo-user" data-email="foreman1@kowhaiconstruction.co.nz"><span class="avatar">CT</span><span><b>Chris Taylor</b><small>Foreman — capture & dispatch</small></span></button>
             <button class="demo-user" data-email="qs@kowhaiconstruction.co.nz"><span class="avatar">AM</span><span><b>Alex Morgan</b><small>QS — review & pilot console</small></span></button>
-            <button class="demo-user" data-email="founder@boundbuild.app"><span class="avatar">JL</span><span><b>Jordan Lee</b><small>Founder — all companies</small></span></button>
+            <button class="demo-user" data-email="founder@boundbuild.app"><span class="avatar">JL</span><span><b>Jordan Lee</b><small>Site Manager — capture &amp; dispatch</small></span></button>
           </div>
           <div class="demo-pw">All demo accounts use password <code>boundbuild-demo</code></div>
         </div>
@@ -1145,7 +1145,7 @@ const App = (() => {
         <form id="user-form" class="form">
           <div class="field"><label>Name *</label><input name="name" required maxlength="80"></div>
           <div class="field"><label>Email *</label><input name="email" type="email" required></div>
-          <div class="field"><label>Role</label><select name="role"><option value="user">Foreman / site user</option><option value="admin">Admin / QS / office</option></select></div>
+          <div class="field"><label>Role</label><select name="role"><option value="user">Foreman / site user</option><option value="site manager">Site Manager</option><option value="admin">Admin / QS / office</option></select></div>
           <div class="field"><label>Temporary password * (min 8 chars)</label><input name="password" type="text" required minlength="8" placeholder="Give them something to change later"></div>
           <button class="btn primary block" type="submit">${I.plus} Add user</button>
         </form>
