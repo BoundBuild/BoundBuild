@@ -443,7 +443,7 @@ const App = (() => {
                   return;
                 }
                 timer.textContent = 'Uploading audio…';
-                const ext = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : 'webm';
+                const ext = mime.includes('mp4') ? 'mp4' : mime.includes('ogg') ? 'ogg' : mime.includes('wav') ? 'wav' : 'webm';
                 let serverTranscript = null;
                 let sttError = null;
                 try {

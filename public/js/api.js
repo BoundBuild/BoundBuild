@@ -7,9 +7,14 @@ const API = (() => {
   async function req(method, path, body, { raw = false, headers = {} } = {}) {
     const opts = { method, headers: { ...headers } };
     if (token) opts.headers.Authorization = 'Bearer ' + token;
-    if (body !== undefined && !raw) {
-      opts.headers['Content-Type'] = 'application/json';
-      opts.body = JSON.stringify(body);
+    if (body !== undefined) {
+      if (raw) {
+        // Raw uploads (audio/photos) send the blob/bytes as the body verbatim.
+        opts.body = body;
+      } else {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+      }
     }
     const res = await fetch(path, opts);
     if (res.status === 401) {
