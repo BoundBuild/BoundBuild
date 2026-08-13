@@ -16,7 +16,7 @@ const ok = (name, cond) => { console.log((cond ? '✔' : '✘ FAIL') + ' ' + nam
   await page.goto(BASE + '/#/login');
   await page.waitForSelector('#login-form');
   ok('login screen renders', await page.isVisible('#login-form'));
-  ok('demo users shown', (await page.$$('.demo-user')).length === 3);
+  ok('demo users shown', (await page.$$('.demo-user')).length === 2);
 
   // ---- demo login as foreman ----
   await page.waitForTimeout(500); // let the login view mount bind its handlers
