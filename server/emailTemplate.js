@@ -67,10 +67,13 @@ function outboxEmailHtml({ event, project, recipientLink, fromName }) {
       This is an automated commercial event record from BoundBuild. Review the record, reply to this email, or contact the sender ${esc(fromName ? '(' + fromName + ')' : '')} to discuss.<br/>
       Draft records are captured in the field and may contain conversational wording — verify before relying on them commercially.
     </div>
+    ${emailSignatureHtml({ fromName })}
   </td></tr>
 </table>
 </td></tr></table>
 </body></html>`;
 }
+
+const { emailSignatureHtml } = require('./signature');
 
 module.exports = { outboxEmailHtml };
