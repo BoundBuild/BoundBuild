@@ -546,6 +546,61 @@ app.get('/api/admin/metrics', requireAuth, requireRole('founder', 'admin'), (req
   });
 });
 
+// ---------- admin: usage (per pilot builder) ----------
+app.get('/api/admin/usage', requireAuth, requireRole('founder', 'admin'), (req, res) => {
+  const companyIds = req.user.role === 'founder'
+    ? db.companies.map((c) => c.id)
+    : [req.user.companyId];
+  const companies = db.companies.filter((c) => companyIds.includes(c.id));
+  const DAY = 864e5;
+  const nowMs = Date.now();
+  const since = (iso, days) => !!iso && (nowMs - new Date(iso).getTime()) <= days * DAY;
+
+  // 30-day date axis (oldest → today)
+  const days = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
+    days.push({ label: d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }), start: d.getTime(), end: d.getTime() + DAY });
+  }
+  const out = companies.map((c) => {
+    const users = db.users.filter((u) => u.companyId === c.id);
+    const events = db.events.filter((e) => e.companyId === c.id);
+    const captures = db.captureSessions.filter((s) => users.some((u) => u.id === s.userId));
+    const dispatches = db.dispatches.filter((d) => events.some((e) => e.id === d.eventId));
+
+    const lastActiveAt = users.reduce((max, u) => {
+      const t = u.lastSeenAt ? new Date(u.lastSeenAt).getTime() : 0;
+      return t > max ? t : max;
+    }, 0);
+
+    const activityByDay = days.map((d) => {
+      const hit = (t) => { const x = new Date(t).getTime(); return x >= d.start && x < d.end; };
+      return {
+        label: d.label,
+        events: events.filter((e) => hit(e.createdAt)).length,
+        captures: captures.filter((s) => hit(s.startedAt)).length,
+        dispatches: dispatches.filter((dd) => hit(dd.sentAt)).length,
+      };
+    });
+
+    const last7 = (iso, daysN) => since(iso, daysN);    return {
+      id: c.id, name: c.name, industry: c.industry || '', pilotStatus: c.pilotStatus,
+      createdAt: c.createdAt,
+      users: { total: users.length, active7: users.filter((u) => since(u.lastSeenAt, 7)).length, active30: users.filter((u) => since(u.lastSeenAt, 30)).length },
+      lastActiveAt: lastActiveAt ? new Date(lastActiveAt).toISOString() : null,
+      events: { total: events.length, last7: events.filter((e) => last7(e.createdAt, 7)).length, last30: events.filter((e) => last7(e.createdAt, 30)).length },
+      dispatches: { total: dispatches.length, last30: dispatches.filter((d) => last7(d.sentAt, 30)).length },
+      captures: { total: captures.length, last30: captures.filter((s) => last7(s.startedAt, 30)).length, neverSaved: captures.filter((s) => !s.savedAt).length },
+      activityByDay,
+      activity7: activityByDay.slice(-7).reduce((s, d) => s + d.events + d.captures + d.dispatches, 0),
+      activity30: activityByDay.reduce((s, d) => s + d.events + d.captures + d.dispatches, 0),
+      quiet: activityByDay.slice(-7).reduce((s, d) => s + d.events + d.captures + d.dispatches, 0) === 0,
+    };
+  });
+
+  res.json({ generatedAt: now(), companies: out });
+});
+
 // ---------- admin: outbox ----------
 app.get('/api/admin/outbox', requireAuth, requireRole('founder', 'admin'), (req, res) => {
   let list = db.outbox.slice();

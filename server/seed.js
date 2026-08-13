@@ -29,9 +29,9 @@ function seed() {
   if (db.meta.seededAt) return db;
 
   const salt = crypto.randomBytes(16).toString('hex');
-  const mkUser = (name, email, role, companyId) => ({
+  const mkUser = (name, email, role, companyId, password = 'boundbuild-demo') => ({
     id: id('usr'), name, email: email.toLowerCase(), salt,
-    passwordHash: hashPassword('boundbuild-demo', salt),
+    passwordHash: hashPassword(password, salt),
     role, companyId, active: true, createdAt: daysAgo(40), lastSeenAt: hoursAgo(2),
   });
 
@@ -44,7 +44,14 @@ function seed() {
   };
   db.companies.push(company);
 
-  const founder = mkUser('Jordan Lee', 'founder@boundbuild.app', 'site manager', company.id);
+  // Anonymous founder account — identity is generic; password is private (env var,
+  // never committed to the repo). Without BB_FOUNDER_PASSWORD a random password is
+  // generated so the founder is never left with the public demo password.
+  const founderPassword = process.env.BB_FOUNDER_PASSWORD || crypto.randomBytes(18).toString('hex');
+  if (!process.env.BB_FOUNDER_PASSWORD) {
+    console.warn('⚠  BB_FOUNDER_PASSWORD not set — founder password generated randomly. Set BB_FOUNDER_PASSWORD and reseed to control it.');
+  }
+  const founder = mkUser('BoundBuild', 'founder@boundbuild.co.nz', 'founder', company.id, founderPassword);
   const mike = mkUser('Chris Taylor', 'foreman1@kowhaiconstruction.co.nz', 'user', company.id);      // foreman
   const pete = mkUser('Sam Wilson', 'foreman2@kowhaiconstruction.co.nz', 'user', company.id);     // foreman
   const jess = mkUser('Alex Morgan', 'qs@kowhaiconstruction.co.nz', 'admin', company.id);   // QS
