@@ -755,6 +755,10 @@ const App = (() => {
   async function viewSettings() {
     const q = queueListLocal();
     const u = state.user;
+    const companyBlock = state.company
+      ? `<div class="settings-row"><div><b>${esc(state.company.name)}</b><div class="muted">${esc(state.company.industry || 'Pilot company')} · Pilot: <b>${esc(state.company.pilotStatus)}</b></div></div></div>
+          <div class="field"><label>Default project</label><select id="set-project">${state.projects.map((p) => `<option value="${p.id}" ${p.id === state.currentProjectId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>`
+      : `<div class="settings-row"><div><b>Platform founder</b><div class="muted">All pilot companies are visible in the Pilot console.</div></div></div>`;
     return `
       <div class="page">
         <div class="page-head"><h1>Settings</h1></div>
@@ -763,8 +767,7 @@ const App = (() => {
             <div><b>${esc(u.name)}</b><div class="muted">${esc(u.email)}</div>
             <div class="chip" style="color:#FF6A00;border-color:#FF6A0055;background:#FF6A001f;margin-top:6px;">${esc(u.role.toUpperCase())}</div></div>
           </div>
-          <div class="settings-row"><div><b>${esc(state.company ? state.company.name : '—')}</b><div class="muted">${state.company ? esc(state.company.industry || 'Pilot company') : ''} · Pilot: <b>${state.company ? esc(state.company.pilotStatus) : ''}</b></div></div></div>
-          <div class="field"><label>Default project</label><select id="set-project">${state.projects.map((p) => `<option value="${p.id}" ${p.id === state.currentProjectId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>
+          ${companyBlock}
         </div>
 
         <div class="section">
@@ -1053,7 +1056,8 @@ const App = (() => {
     }
 
     if (hash === '#/settings') {
-      $('#set-project').addEventListener('change', (e) => { state.currentProjectId = e.target.value; storeSet('bb_project', e.target.value); toast('Default project updated'); });
+      const projSel = $('#set-project');
+      if (projSel) projSel.addEventListener('change', (e) => { state.currentProjectId = e.target.value; storeSet('bb_project', e.target.value); toast('Default project updated'); });
       $$('[data-retry]').forEach((b) => b.addEventListener('click', async () => {
         const res = await API.syncQueue();
         toast(res.some((r) => r.ok) ? 'Synced ' + res.filter((r) => r.ok).length + ' events' : 'Still offline — try again later', res.some((r) => r.ok) ? 'ok' : 'warn');
