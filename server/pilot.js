@@ -6,6 +6,7 @@
  */
 const { load, save, now } = require('./store');
 const { sendEmail } = require('./mailer');
+const { emailSignatureHtml } = require('./signature');
 
 module.exports = function registerPilotRoutes(app) {
   // CORS preflight for the website (boundbuild.co.nz → app.boundbuild.co.nz)
@@ -59,6 +60,7 @@ module.exports = function registerPilotRoutes(app) {
     </table>
     <a href="mailto:${String(email).trim()}?subject=BoundBuild%20pilot%20-%20${encodeURIComponent(String(company).trim())}" style="display:inline-block;margin-top:20px;background:#FF6A00;color:#0A0C0E;font-weight:800;font-size:14px;text-decoration:none;padding:13px 24px;border-radius:10px;">Reply to this enquiry →</a>
     <div style="color:#6B7480;font-size:11px;margin-top:18px;border-top:1px solid #23282E;padding-top:12px;">Sent automatically from boundbuild.co.nz · stored in the BoundBuild ledger</div>
+    ${emailSignatureHtml({})}
   </div>
 </div></body></html>`;
 
