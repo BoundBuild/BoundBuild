@@ -230,7 +230,6 @@ const App = (() => {
           <div class="demo-title">${I.sparkle} Pilot demo — one tap</div>
           <div class="demo-users">
             <button class="demo-user" data-email="foreman1@kowhaiconstruction.co.nz"><span class="avatar">CT</span><span><b>Chris Taylor</b><small>Foreman — capture & dispatch</small></span></button>
-            <button class="demo-user" data-email="qs@kowhaiconstruction.co.nz"><span class="avatar">AM</span><span><b>Alex Morgan</b><small>QS — review & pilot console</small></span></button>
           </div>
           <div class="demo-pw">All demo accounts use password <code>boundbuild-demo</code></div>
         </div>
