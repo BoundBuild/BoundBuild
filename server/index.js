@@ -601,6 +601,66 @@ app.get('/api/admin/usage', requireAuth, requireRole('founder', 'admin'), (req, 
   res.json({ generatedAt: now(), companies: out });
 });
 
+// ---------- admin: pilot outreach tracker (founder only) ----------
+const OUTREACH_STATUSES = ['not-contacted', 'sent', 'replied', 'meeting', 'onboarded', 'no'];
+
+app.get('/api/admin/outreach', requireAuth, requireRole('founder'), (req, res) => {
+  res.json({ targets: db.outreach });
+});
+
+app.post('/api/admin/outreach', requireAuth, requireRole('founder'), (req, res) => {
+  const b = req.body || {};
+  if (!b.company || !String(b.company).trim()) return res.status(400).json({ error: 'Company name is required' });
+  const target = {
+    id: id('tgt'),
+    company: String(b.company).trim(),
+    contact: String(b.contact || '').trim(),
+    role: String(b.role || '').trim(),
+    email: String(b.email || '').trim(),
+    phone: String(b.phone || '').trim(),
+    method: b.method === 'phone' ? 'phone' : 'email',
+    status: OUTREACH_STATUSES.includes(b.status) ? b.status : 'not-contacted',
+    lastTouchAt: b.lastTouchAt || null,
+    nextAction: String(b.nextAction || '').trim(),
+    nextActionAt: b.nextActionAt || null,
+    notes: String(b.notes || '').trim(),
+    createdAt: now(),
+    updatedAt: now(),
+  };
+  db.outreach.push(target);
+  pushAudit('outreach', target.id, 'Added', `Target ${target.company}`, req.user);
+  save();
+  res.json(target);
+});
+
+app.put('/api/admin/outreach/:id', requireAuth, requireRole('founder'), (req, res) => {
+  const t = db.outreach.find((x) => x.id === req.params.id);
+  if (!t) return res.status(404).json({ error: 'Target not found' });
+  const b = req.body || {};
+  if (b.company !== undefined) t.company = String(b.company).trim();
+  if (b.contact !== undefined) t.contact = String(b.contact).trim();
+  if (b.role !== undefined) t.role = String(b.role).trim();
+  if (b.email !== undefined) t.email = String(b.email).trim();
+  if (b.phone !== undefined) t.phone = String(b.phone).trim();
+  if (b.method !== undefined) t.method = b.method === 'phone' ? 'phone' : 'email';
+  if (b.status !== undefined && OUTREACH_STATUSES.includes(b.status)) t.status = b.status;
+  if (b.nextAction !== undefined) t.nextAction = String(b.nextAction).trim();
+  if (b.nextActionAt !== undefined) t.nextActionAt = b.nextActionAt || null;
+  if (b.notes !== undefined) t.notes = String(b.notes).trim();
+  if (b.touched !== undefined) t.lastTouchAt = now();
+  t.updatedAt = now();
+  save();
+  res.json(t);
+});
+
+app.delete('/api/admin/outreach/:id', requireAuth, requireRole('founder'), (req, res) => {
+  const before = db.outreach.length;
+  db.outreach = db.outreach.filter((x) => x.id !== req.params.id);
+  if (db.outreach.length === before) return res.status(404).json({ error: 'Target not found' });
+  save();
+  res.json({ ok: true });
+});
+
 // ---------- admin: outbox ----------
 app.get('/api/admin/outbox', requireAuth, requireRole('founder', 'admin'), (req, res) => {
   let list = db.outbox.slice();

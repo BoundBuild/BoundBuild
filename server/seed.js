@@ -237,6 +237,18 @@ function seed() {
     });
   }
 
+  // Pilot outreach targets (founder's tracker — preloaded for the Christchurch push)
+  const outreach = [
+    { company: 'HRS Construction', contact: 'Andrew Marshall', role: 'Director & GM', email: 'andrew@hrsconstruction.co.nz', phone: '0274 20 60 90', method: 'email', status: 'not-contacted', nextAction: 'Send day-1 email', notes: 'In-house QS; projects to $50M. Lead with revenue protection.' },
+    { company: 'Miles Construction', contact: 'Mark Farrell', role: 'CEO', email: '', phone: '', method: 'email', status: 'not-contacted', nextAction: 'Source email, then send', notes: 'Multi-city (Chch/Wellington/Auckland), commercial + multi-unit.' },
+    { company: 'Contract Construction', contact: 'John Cleary', role: 'GM', email: 'jcleary@contract-construction.co.nz', phone: '021 321 120', method: 'email', status: 'not-contacted', nextAction: 'Send day-1 email', notes: 'Est. 1993, ~32 staff, many foremen.' },
+    { company: 'Zeal Construction', contact: 'Mike', role: '', email: 'mike@zealconstruction.co.nz', phone: '021 0255 6439', method: 'phone', status: 'not-contacted', nextAction: 'Call day 4-5', notes: 'Fixed-price + design & build — strongest angle.' },
+    { company: 'Cook Brothers Canterbury', contact: 'Iain Irons', role: 'Commercial Manager', email: '', phone: '03 260 7260', method: 'phone', status: 'not-contacted', nextAction: 'Call day 4-5', notes: 'He IS the commercial function — peer-to-peer.' },
+  ];
+  db.outreach.push(...outreach.map((o) => ({
+    ...o, id: id('tgt'), lastTouchAt: null, nextActionAt: null, createdAt: now(), updatedAt: now(),
+  })));
+
   db.meta.seededAt = now();
   save();
   console.log('✔ Seeded demo data:', db.companies.length, 'company,', db.users.length, 'users,', db.events.length, 'events,', db.captureSessions.length, 'capture sessions');

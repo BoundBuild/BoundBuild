@@ -28,6 +28,7 @@ const DEFAULT_DB = () => ({
   dispatches: [],     // {id, eventId, to, method:'email'|'link', status:'queued'|'sent'|'failed', token, sentAt, error}
   captureSessions: [],// {id, userId, projectId, startedAt, savedAt, eventId, durationMs, abandoned}
   outbox: [],         // {id, dispatchId, eventId, to, subject, html, eml, sentAt, method}
+  outreach: [],       // {id, company, contact, role, email, phone, method, status, lastTouchAt, nextAction, nextActionAt, notes, createdAt, updatedAt}
   audit: [],          // {id, entity, entityId, action, detail, by, at}
 });
 
