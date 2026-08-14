@@ -796,7 +796,7 @@ const App = (() => {
     const em = await API.emailStatus();
     const isFounder = state.user.role === 'founder';
     const tabs = [['overview', 'Overview'], ['usage', 'Usage'], ['outbox', 'Outbox'], ['team', 'Team'], ['exports', 'Exports']];
-    if (isFounder) tabs.push(['companies', 'Companies']);
+    if (isFounder) tabs.push(['companies', 'Companies'], ['outreach', 'Outreach']);
     const tab = (location.hash.split('?')[1] || 'overview');
     const met = m.metrics;
     return `
@@ -809,6 +809,7 @@ const App = (() => {
         ${tab === 'team' ? '<div id="team-wrap"><div class="page-loading">Loading…</div></div>' : ''}
         ${tab === 'exports' ? adminExports(m) : ''}
         ${tab === 'companies' && isFounder ? '<div id="companies-wrap"><div class="page-loading">Loading…</div></div>' : ''}
+        ${tab === 'outreach' && isFounder ? '<div id="outreach-wrap"><div class="page-loading">Loading…</div></div>' : ''}
       </div>`;
   }
 
@@ -1096,6 +1097,7 @@ const App = (() => {
       if (tab === 'outbox') mountOutbox();
       if (tab === 'team') mountTeam();
       if (tab === 'companies') mountCompanies();
+      if (tab === 'outreach') mountOutreach();
       if (tab === 'exports') {
         $('#exp-events').addEventListener('click', async () => {
           const res = await API._raw('GET', '/api/admin/export/events.csv');
@@ -1210,6 +1212,110 @@ const App = (() => {
         <div class="muted" style="margin-bottom:12px;">How often each builder's team is using the app — events + captures per day over the last 30 days. Sorted by most recently active.</div>
         ${rows || '<div class="empty"><b>No pilot companies yet</b><span>Registered builders appear here with their usage.</span></div>'}
       </div>`;
+  }
+
+  async function mountOutreach() {
+    const wrap = $('#outreach-wrap');
+    const { targets } = await API.outreach();
+    const STATUS = [
+      ['not-contacted', 'Not contacted', '#9AA3AD'],
+      ['sent', 'Sent', '#FFB020'],
+      ['replied', 'Replied', '#5AA9FF'],
+      ['meeting', 'Meeting', '#FF6A00'],
+      ['onboarded', 'Onboarded', '#4CC38A'],
+      ['no', 'Declined', '#FF5A5F'],
+    ];
+    const statusChip = (s) => {
+      const [id, label, c] = STATUS.find((x) => x[0] === s) || STATUS[0];
+      return `<span class="chip" style="color:${c};border-color:${c}55;background:${c}1f;">${label}</span>`;
+    };
+    const sorted = targets.slice().sort((a, b) => String(b.lastTouchAt || b.createdAt || '').localeCompare(String(a.lastTouchAt || a.createdAt || '')));
+    const cards = sorted.map((t) => `
+      <div class="outreach-card">
+        <div class="outreach-head">
+          <div><b>${esc(t.company)}</b><div class="muted">${esc(t.contact)}${t.role ? ' · ' + esc(t.role) : ''}</div></div>
+          <div class="outreach-status">${statusChip(t.status)}</div>
+        </div>
+        <div class="outreach-contact">${t.email ? `<code>${esc(t.email)}</code>` : ''}${t.phone ? `<span class="muted">${t.email ? ' · ' : ''}${esc(t.phone)}</span>` : ''}<span class="muted"> · ${t.method === 'phone' ? 'phone-first' : 'email-first'}</span></div>
+        <div class="outreach-row"><span class="muted">Last touch:</span> <b>${t.lastTouchAt ? timeAgo(t.lastTouchAt) : 'never'}</b><span class="muted" style="margin-left:12px;">Next:</span> <b>${t.nextAction ? esc(t.nextAction) : '—'}${t.nextActionAt ? ' · ' + esc(t.nextActionAt) : ''}</b></div>
+        ${t.notes ? `<div class="outreach-notes muted">${esc(t.notes)}</div>` : ''}
+        <div class="outreach-actions">
+          <select data-status="${t.id}">${STATUS.map(([id, label]) => `<option value="${id}" ${t.status === id ? 'selected' : ''}>${label}</option>`).join('')}</select>
+          <button class="btn small" data-touch="${t.id}">Log touch now</button>
+          <button class="btn small" data-edit="${t.id}">Edit</button>
+          <button class="btn small" data-del="${t.id}">Remove</button>
+        </div>
+      </div>`).join('');
+    wrap.innerHTML = `
+      <div class="section">
+        <div class="section-head"><h2>Pilot outreach tracker</h2><span class="page-count">${targets.length} targets</span></div>
+        <div class="muted" style="margin-bottom:12px;">Track each builder: first touch → reply → meeting → onboarded. Log every contact so nothing drops.</div>
+        ${cards || '<div class="empty"><b>No targets yet</b><span>Add your first builder below.</span></div>'}
+      </div>
+      <div class="section">
+        <div class="section-head"><h2>Add builder</h2></div>
+        <form id="outreach-form" class="form">
+          <div class="field"><label>Company *</label><input name="company" required maxlength="80" placeholder="e.g. HRS Construction"></div>
+          <div class="field-row">
+            <div class="field"><label>Contact name</label><input name="contact" maxlength="80" placeholder="e.g. Andrew Marshall"></div>
+            <div class="field"><label>Role</label><input name="role" maxlength="60" placeholder="e.g. Director & GM"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Email</label><input name="email" type="email" placeholder="name@company.co.nz"></div>
+            <div class="field"><label>Phone</label><input name="phone" maxlength="40" placeholder="e.g. 027 000 0000"></div>
+          </div>
+          <div class="field"><label>Approach</label><select name="method"><option value="email">Email first</option><option value="phone">Phone first</option></select></div>
+          <div class="field"><label>Notes</label><textarea name="notes" rows="2" placeholder="Angle, context, anything to remember"></textarea></div>
+          <button class="btn primary block" type="submit">${I.plus} Add builder</button>
+        </form>
+      </div>`;
+    wrap.querySelectorAll('[data-status]').forEach((sel) => sel.addEventListener('change', async () => {
+      try { await API.updateOutreach(sel.dataset.status, { status: sel.value }); toast('Status updated'); } catch (e) { toast(e.message, 'err'); }
+    }));
+    wrap.querySelectorAll('[data-touch]').forEach((b) => b.addEventListener('click', async () => {
+      try { await API.updateOutreach(b.dataset.touch, { touched: true }); toast('Touch logged'); mountOutreach(); } catch (e) { toast(e.message, 'err'); }
+    }));
+    wrap.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => openOutreachEdit(b.dataset.edit)));
+    wrap.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('Remove this target?')) return;
+      try { await API.deleteOutreach(b.dataset.del); toast('Removed'); mountOutreach(); } catch (e) { toast(e.message, 'err'); }
+    }));
+    const form = $('#outreach-form');
+    if (form) form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target));
+      try { await API.addOutreach(data); toast('Builder added'); mountOutreach(); } catch (err) { toast(err.message, 'err'); }
+    });
+  }
+
+  function openOutreachEdit(id) {
+    API.outreach().then(({ targets }) => {
+      const t = targets.find((x) => x.id === id);
+      if (!t) return;
+      const root = $('#modal-root');
+      root.innerHTML = `
+        <div class="modal-backdrop"><div class="modal">
+          <div class="modal-head"><h3>Edit ${esc(t.company)}</h3><button class="icon-btn" id="modal-close">${I.x}</button></div>
+          <div class="modal-body">
+            <form id="outreach-edit-form" class="form">
+              <div class="field"><label>Company *</label><input name="company" required maxlength="80" value="${esc(t.company)}"></div>
+              <div class="field-row"><div class="field"><label>Contact name</label><input name="contact" maxlength="80" value="${esc(t.contact)}"></div><div class="field"><label>Role</label><input name="role" maxlength="60" value="${esc(t.role)}"></div></div>
+              <div class="field-row"><div class="field"><label>Email</label><input name="email" type="email" value="${esc(t.email)}"></div><div class="field"><label>Phone</label><input name="phone" maxlength="40" value="${esc(t.phone)}"></div></div>
+              <div class="field"><label>Approach</label><select name="method"><option value="email" ${t.method !== 'phone' ? 'selected' : ''}>Email first</option><option value="phone" ${t.method === 'phone' ? 'selected' : ''}>Phone first</option></select></div>
+              <div class="field"><label>Next action</label><input name="nextAction" maxlength="120" placeholder="e.g. Call to book demo" value="${esc(t.nextAction)}"></div>
+              <div class="field"><label>Notes</label><textarea name="notes" rows="2">${esc(t.notes)}</textarea></div>
+              <button class="btn primary block" type="submit">${I.check} Save</button>
+            </form>
+          </div>
+        </div></div>`;
+      $('#modal-close').addEventListener('click', closeModal);
+      root.querySelector('.modal-backdrop').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeModal(); });
+      $('#outreach-edit-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target));
+        try { await API.updateOutreach(id, data); closeModal(); toast('Saved'); mountOutreach(); } catch (err) { toast(err.message, 'err'); }
+      });
+    });
   }
 
   async function reloadLedgerList() {

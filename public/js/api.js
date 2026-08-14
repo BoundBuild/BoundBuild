@@ -96,6 +96,10 @@ const API = (() => {
 
     metrics: () => json('GET', '/api/admin/metrics'),
     usage: () => json('GET', '/api/admin/usage'),
+    outreach: () => json('GET', '/api/admin/outreach'),
+    addOutreach: (body) => json('POST', '/api/admin/outreach', body),
+    updateOutreach: (id, body) => json('PUT', '/api/admin/outreach/' + id, body),
+    deleteOutreach: (id) => json('DELETE', '/api/admin/outreach/' + id),
     emailStatus: () => json('GET', '/api/admin/email-status'),
     emailTest: (to) => json('POST', '/api/admin/email-test', { to }),
     companies: () => json('GET', '/api/admin/companies'),
