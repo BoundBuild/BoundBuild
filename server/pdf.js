@@ -156,7 +156,7 @@ function generateEventPdf(ev, { project, creatorName, mediaDirs = [] } = {}) {
     if (audio) {
       ensure(30);
       doc.fillColor(C.green).font('Helvetica').fontSize(9)
-        .text(`● Original voice note retained on the record${audio.size ? ` (${Math.round(audio.size / 1024)} KB)` : ''}`, M, y);
+        .text(`• Original voice note retained on the record${audio.size ? ` (${Math.round(audio.size / 1024)} KB)` : ''}`, M, y);
       y += 20;
     }
 
