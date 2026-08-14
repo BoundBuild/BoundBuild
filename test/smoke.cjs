@@ -16,7 +16,7 @@ const ok = (name, cond) => { console.log((cond ? '✔' : '✘ FAIL') + ' ' + nam
   await page.goto(BASE + '/#/login');
   await page.waitForSelector('#login-form');
   ok('login screen renders', await page.isVisible('#login-form'));
-  ok('demo users shown', (await page.$$('.demo-user')).length === 2);
+  ok('demo users shown', (await page.$$('.demo-user')).length === 1);
 
   // ---- demo login as foreman ----
   await page.waitForTimeout(500); // let the login view mount bind its handlers
@@ -101,34 +101,8 @@ const ok = (name, cond) => { console.log((cond ? '✔' : '✘ FAIL') + ' ' + nam
   await page.waitForSelector('#btn-logout', { timeout: 5000 });
   ok('settings renders', true);
 
-  // ---- admin as jess ----
-  await page.click('#btn-logout');
-  await page.waitForSelector('#login-form', { timeout: 5000 });
-  await page.waitForTimeout(500); // let the login view mount bind its handlers
-  await page.click('.demo-user[data-email="qs@kowhaiconstruction.co.nz"]');
-  await page.waitForSelector('.topbar-btn[href="#/admin"]', { timeout: 8000 });
-  ok('QS sees Pilot console link', true);
-  await page.click('.topbar-btn[href="#/admin"]');
-  await page.waitForSelector('.metric-card', { timeout: 8000 });
-  ok('metrics cards render', (await page.$$('.metric-card')).length === 6);
-  ok('charts render', (await page.$$('.chart-card')).length >= 3);
-  ok('median capture shown', /(2[0-9]|3[0-9]|4[0-9]|5[0-9])s/.test(await page.textContent('.metric-card')));
-  // outbox tab
-  await page.click('.chip-btn[href="#/admin?outbox"]');
-  await page.waitForSelector('.outbox-item', { timeout: 8000 });
-  ok('outbox lists dispatches', (await page.$$('.outbox-item')).length >= 5);
-  await page.click('.outbox-item [data-html]');
-  await page.waitForSelector('.email-frame', { timeout: 5000 });
-  ok('email preview opens', true);
-  await page.click('#modal-close');
-  // team tab
-  await page.click('.chip-btn[href="#/admin?team"]');
-  await page.waitForSelector('#user-form', { timeout: 8000 });
-  ok('team management renders', true);
-  // exports tab
-  await page.click('.chip-btn[href="#/admin?exports"]');
-  await page.waitForSelector('#exp-events', { timeout: 5000 });
-  ok('exports tab renders', true);
+  // ---- admin console (founder-only now — no demo admin account) ----
+  // The pilot console is founder-only; admin-console coverage lives in test/e2e.cjs.
 
   // ---- register new company ----
   await page.click('#bottomnav .nav-item[href="#/settings"]');

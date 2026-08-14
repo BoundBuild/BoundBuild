@@ -82,6 +82,7 @@ async function waitFor(url, tries = 40) {
       OPENAI_API_KEY: 'sk_test_123',
       STT_URL: 'http://127.0.0.1:9100/v1/audio/transcriptions',
       STT_MODEL: 'whisper-1',
+      BB_FOUNDER_PASSWORD: 'e2e-test-password',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -104,8 +105,8 @@ async function waitFor(url, tries = 40) {
     ok('login issues a real session token', login.status === 200 && !!login.data.token);
     const token = login.data.token;
     // admin endpoints need a founder/admin session (role enforcement is real)
-    const jessLogin = await j('POST', '/api/auth/login', { email: 'qs@kowhaiconstruction.co.nz', password: 'boundbuild-demo' });
-    const adminToken = jessLogin.data.token;
+    const founderLogin = await j('POST', '/api/auth/login', { email: 'founder@boundbuild.co.nz', password: 'e2e-test-password' });
+    const adminToken = founderLogin.data.token;
     const jAdmin = (method, p, body) => j(method, p, body, adminToken);
 
     /* 2. audio upload → server-side STT */
@@ -193,7 +194,7 @@ async function waitFor(url, tries = 40) {
     /* 8. cookie auth set for direct downloads */
     const loginRes = await fetch(`${BASE}/api/auth/login`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'qs@kowhaiconstruction.co.nz', password: 'boundbuild-demo' }),
+      body: JSON.stringify({ email: 'founder@boundbuild.co.nz', password: 'e2e-test-password' }),
       redirect: 'manual',
     });
     ok('login sets session cookie', (loginRes.headers.get('set-cookie') || '').includes('bbsid='));
