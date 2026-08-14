@@ -570,3 +570,49 @@ textarea { resize: vertical; min-height: 90px; }
   border-radius: 8px;
   padding: 4px 2px;
 }
+
+/* ---- Pilot outreach tracker (Outreach tab) ---- */
+.outreach-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+.outreach-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.outreach-head b { font-size: 15px; }
+.outreach-status { flex-shrink: 0; }
+.outreach-contact { margin-bottom: 8px; font-size: 13px; }
+.outreach-contact code { font-size: 12px; }
+.outreach-row { font-size: 13px; margin-bottom: 8px; }
+.outreach-notes {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.outreach-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.outreach-actions select {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.outreach-actions .btn.small { padding: 7px 12px; font-size: 12.5px; }
