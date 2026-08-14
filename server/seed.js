@@ -39,7 +39,8 @@ function seed() {
     id: id('cmp'),
     name: 'Kowhai Construction Ltd',
     industry: 'Commercial & residential builder',
-    pilotStatus: 'active',
+    pilotStatus: 'demo',
+    isDemo: true,
     createdAt: daysAgo(40),
   };
   db.companies.push(company);
@@ -54,8 +55,7 @@ function seed() {
   const founder = mkUser('BoundBuild', 'founder@boundbuild.co.nz', 'founder', null, founderPassword);
   const mike = mkUser('Chris Taylor', 'foreman1@kowhaiconstruction.co.nz', 'user', company.id);      // foreman
   const pete = mkUser('Sam Wilson', 'foreman2@kowhaiconstruction.co.nz', 'user', company.id);     // foreman
-  const jess = mkUser('Alex Morgan', 'qs@kowhaiconstruction.co.nz', 'admin', company.id);   // QS
-  db.users.push(founder, mike, pete, jess);
+  db.users.push(founder, mike, pete);
 
   const p1 = {
     id: id('prj'), name: 'Rimu Ridge Terraces', location: 'Waimakariri, Christchurch',
@@ -87,7 +87,7 @@ function seed() {
   const events = [
     ev({
       ref: 'BB-0001', type: 'Unforeseen condition', by: mike.id, projectId: p1.id,
-      at: daysAgo(12, 8, 14), status: 'reviewed', reviewedAt: daysAgo(11, 15, 30), reviewedById: jess.id,
+      at: daysAgo(12, 8, 14), status: 'sent', sentAt: daysAgo(12, 9, 2),
       title: 'Buried slab found in Unit 6 excavation',
       summary: 'While excavating the Unit 6 foundation we struck a buried reinforced concrete slab approximately 600mm below the existing ground level. The slab was not shown on the geotech or the structural drawings. Excavator had to stop, we need direction on removal and any contaminated material. This is an unforeseen condition under the contract.',
       location: 'Unit 6 — foundation zone', instructedBy: 'Structural engineer',
@@ -97,12 +97,11 @@ function seed() {
       audit: [
         { action: 'Captured', by: { id: mike.id, name: mike.name }, at: daysAgo(12, 8, 14), detail: 'Voice note 0:58 + 2 photos' },
         { action: 'Dispatched to QS', by: { id: mike.id, name: mike.name }, at: daysAgo(12, 9, 2), detail: 'qs@kowhaiconstruction.co.nz' },
-        { action: 'Reviewed', by: { id: jess.id, name: jess.name }, at: daysAgo(11, 15, 30), detail: 'Record accepted — added to claim register' },
       ],
     }),
     ev({
       ref: 'BB-0002', type: 'Delay', by: mike.id, projectId: p1.id,
-      at: daysAgo(9, 7, 55), status: 'reviewed', reviewedAt: daysAgo(8, 10, 5), reviewedById: jess.id,
+      at: daysAgo(9, 7, 55), status: 'sent',
       sentAt: daysAgo(9, 8, 40),
       title: 'Wet weather stop — excavation 2 days behind',
       summary: 'Heavy rain overnight flooded the northern excavation trench. We pumped it out this morning but the batter has softened and the geotech wants it benched before we go back in. Two days lost on the critical path. Photos attached show standing water at the north end.',
@@ -113,7 +112,6 @@ function seed() {
       audit: [
         { action: 'Captured', by: { id: mike.id, name: mike.name }, at: daysAgo(9, 7, 55), detail: 'Voice note 0:41 + 1 photo' },
         { action: 'Dispatched to QS', by: { id: mike.id, name: mike.name }, at: daysAgo(9, 8, 40), detail: 'qs@kowhaiconstruction.co.nz' },
-        { action: 'Reviewed', by: { id: jess.id, name: jess.name }, at: daysAgo(8, 10, 5), detail: 'Weather clause — notifying client for EOT' },
       ],
     }),
     ev({
@@ -132,7 +130,7 @@ function seed() {
     }),
     ev({
       ref: 'BB-0004', type: 'Material substitution', by: mike.id, projectId: p1.id,
-      at: daysAgo(5, 13, 40), status: 'reviewed', reviewedAt: daysAgo(4, 9, 20), reviewedById: jess.id,
+      at: daysAgo(5, 13, 40), status: 'sent',
       sentAt: daysAgo(5, 14, 12),
       title: 'Timber supply substitution — H3.2 studs out of stock',
       summary: 'Our timber supplier cannot deliver the specified H3.2 treated studs until next week. They have offered a structurally equivalent alternative grade with the same framing schedule. Architect needs to approve the substitution before we continue wall framing. Additional cost is nil, but it affects the programme.',
@@ -143,7 +141,6 @@ function seed() {
       audit: [
         { action: 'Captured', by: { id: mike.id, name: mike.name }, at: daysAgo(5, 13, 40), detail: 'Voice note 0:47 + 1 photo' },
         { action: 'Dispatched to QS', by: { id: mike.id, name: mike.name }, at: daysAgo(5, 14, 12), detail: 'qs@kowhaiconstruction.co.nz' },
-        { action: 'Reviewed', by: { id: jess.id, name: jess.name }, at: daysAgo(4, 9, 20), detail: 'Requesting supplier substitution docs' },
       ],
     }),
     ev({

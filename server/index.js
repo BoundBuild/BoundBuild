@@ -84,6 +84,11 @@ function canSeeEvent(user, evt) {
   if (!evt) return false;
   return canSeeCompany(user, evt.companyId);
 }
+// Demo companies (seeded for sales demos) are excluded from the founder's
+// pilot-console views, so the console reflects only real/active pilot companies.
+function realCompanies() {
+  return db.companies.filter((c) => !c.isDemo);
+}
 
 // ---------- auth routes ----------
 app.post('/api/auth/register', (req, res) => {
@@ -452,7 +457,7 @@ app.post('/api/events/:id/review', requireAuth, requireRole('founder', 'admin'),
 
 // ---------- admin: companies / users ----------
 app.get('/api/admin/companies', requireAuth, requireRole('founder'), (req, res) => {
-  res.json(db.companies.map((c) => ({
+  res.json(realCompanies().map((c) => ({
     ...c,
     userCount: db.users.filter((u) => u.companyId === c.id).length,
     projectCount: db.projects.filter((p) => p.companyId === c.id).length,
@@ -488,7 +493,7 @@ app.post('/api/admin/users', requireAuth, requireRole('founder', 'admin'), (req,
 // ---------- admin: metrics (pilot instrumentation) ----------
 app.get('/api/admin/metrics', requireAuth, requireRole('founder', 'admin'), (req, res) => {
   const companyIds = req.user.role === 'founder'
-    ? db.companies.map((c) => c.id)
+    ? realCompanies().map((c) => c.id)
     : [req.user.companyId];
   const inScope = (x) => companyIds.includes(x.companyId);
 
@@ -549,7 +554,7 @@ app.get('/api/admin/metrics', requireAuth, requireRole('founder', 'admin'), (req
 // ---------- admin: usage (per pilot builder) ----------
 app.get('/api/admin/usage', requireAuth, requireRole('founder', 'admin'), (req, res) => {
   const companyIds = req.user.role === 'founder'
-    ? db.companies.map((c) => c.id)
+    ? realCompanies().map((c) => c.id)
     : [req.user.companyId];
   const companies = db.companies.filter((c) => companyIds.includes(c.id));
   const DAY = 864e5;
