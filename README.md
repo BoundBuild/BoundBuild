@@ -26,7 +26,9 @@ site events, capture sessions, dispatches and analytics on first boot (`data/db.
 | Account | Role | What to try |
 |---|---|---|
 | `foreman1@kowhaiconstruction.co.nz` | Foreman (user) | Capture → AI draft → save → dispatch |
-| `qs@kowhaiconstruction.co.nz` | QS (admin) | Pilot console, outbox, team, exports |
+
+> The demo company's data is hidden from the founder's pilot console — the console shows
+> only real pilot companies. There is no demo admin account (the pilot console is founder-only).
 
 The login screen has one-tap demo logins. **Registration creates a brand-new company** (pilot bootstrap).
 
