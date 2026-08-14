@@ -21,6 +21,7 @@ function emailSignatureHtml({ fromName = '' } = {}) {
           <div><b style="color:#F5F7FA;">BoundBuild Team</b></div>
           <div>BoundBuild — construction commercial event capture</div>
           <div><a href="https://boundbuild.co.nz" style="color:#FF8A33;text-decoration:none;">boundbuild.co.nz</a></div>
+          <div><a href="tel:0220680824" style="color:#FF8A33;text-decoration:none;">022 068 0824</a> · <a href="mailto:pilot@boundbuild.co.nz" style="color:#FF8A33;text-decoration:none;">pilot@boundbuild.co.nz</a></div>
         </div>
       </td>
     </tr>
